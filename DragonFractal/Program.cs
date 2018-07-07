@@ -27,7 +27,19 @@ namespace DragonFractal
                 for (int y = 0; y < 500; ++y)
                     for (int x = 0; x < 500; ++x)
                         image.Bits[500 * y + x] = white;
-                fractal.RenderFractal(image, 20, Fractal.renderLine, finalTransform);
+                fractal.RenderFractal(image, 16, Fractal.renderLine, finalTransform);
+
+                int red = unchecked((int)0xffff0000); // red
+                // Primary spiral
+                ImProc.DrawSpiral(150, 250, Math.PI / 2, 100 * 1 / 3.0, 40 * Math.PI, Math.PI / 2, Math.PI / 512, 1.0 / 16.0, red, image);
+                ImProc.DrawSpiral(350, 250, -Math.PI / 2, 100 * 2 / 3.0, 40 * Math.PI, Math.PI / 2, Math.PI / 512, 1.0 / 16.0, red, image);
+
+                // Secondary spirals
+                int blue = unchecked((int)0xff0000ff); // blue
+                ImProc.DrawSpiral(250, 150, Math.PI / 2, 100 / 3.0, 40 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, blue, image);
+                ImProc.DrawSpiral(250, 150, 3 * Math.PI / 4, 100 / 3.0, 40 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, blue, image);
+                ImProc.DrawSpiral(250, 150, Math.PI, 100 / 3.0, 40 * Math.PI, 3 * Math.PI / 8, Math.PI / 512, 1.0 / 16.0, blue, image);
+
                 IO.SaveImage(image, @"C:\Users\info\Desktop\fractal.bmp");
             }
         }

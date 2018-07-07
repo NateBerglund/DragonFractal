@@ -58,6 +58,40 @@ namespace DragonFractal
             }
         }
 
+        /// <summary>
+        /// Draws a spiral on an image. No subpixel sampling is used.
+        /// </summary>
+        /// <param name="x">x-coordiante of the center of the spiral</param>
+        /// <param name="y">y-coordinate of the center of the spiral</param>
+        /// <param name="thetaInit">Inital theta of the spiral</param>
+        /// <param name="rInit">Intial radius of the spiral</param>
+        /// <param name="thetaPlusSpan">Span of the spiral in theta</param>
+        /// <param name="thetaMinusSpan">Span of the spiral backwards in theta</param>
+        /// <param name="thetaStep">Step size in theta</param>
+        /// <param name="scalePerRev">Amount the spiral will scale for each revolution</param>
+        /// <param name="color">Color to give the spiral</param>
+        /// <param name="image">Image to draw the spiral onto</param>
+        public static void DrawSpiral(double x, double y, double thetaInit, double rInit, double thetaPlusSpan, double thetaMinusSpan, double thetaStep, double scalePerRev, int color, DirectBitmap image)
+        {
+            double prevX = double.NaN;
+            double prevY = double.NaN;
+            for (double baseTheta = -thetaMinusSpan; baseTheta < thetaPlusSpan; baseTheta += thetaStep)
+            {
+                double theta = thetaInit + baseTheta;
+                double revs = baseTheta / (2.0 * Math.PI);
+                double alpha = Math.Log(scalePerRev);
+                double r = rInit * Math.Exp(alpha * revs);
+                double curX = x + r * Math.Cos(theta);
+                double curY = y + r * Math.Sin(theta);
+                if (!double.IsNaN(prevX) && !double.IsNaN(prevY))
+                {
+                    DrawLine(prevX, prevY, curX, curY, color, image);
+                }
+                prevX = curX;
+                prevY = curY;
+            }
+        }
+
         #endregion Drawing
 
         #region Filters
