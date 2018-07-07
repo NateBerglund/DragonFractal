@@ -49,6 +49,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DirectBitmap.cs" />
+    <Compile Include="Fractal.cs" />
+    <Compile Include="ImProc.cs" />
+    <Compile Include="IO.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
