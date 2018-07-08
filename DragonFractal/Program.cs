@@ -20,25 +20,26 @@ namespace DragonFractal
             var Rot135 = DenseMatrix.OfArray(new double[,] { { Math.Cos(3 * Math.PI / 4), -Math.Sin(3 * Math.PI / 4), 0 }, { Math.Sin(3 * Math.PI / 4), Math.Cos(3 * Math.PI / 4), 0 }, { 0, 0, 1 } });
             fractal.IFS.Add(Rot45 * Scale * Translate);
             fractal.IFS.Add(Rot135 * Scale * Translate);
-            var finalTransform = DenseMatrix.OfArray(new double[,] { { 100, 0, 250 }, { 0, 100, 150 }, { 0, 0, 1 } });
-            using (DirectBitmap image = new DirectBitmap(500, 500))
+            int sf = 256;
+            int w = 3 * sf;
+            int h = 2 * sf;
+            var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4.0 * sf / 3.0 }, { 0, sf, sf / 3.0 }, { 0, 0, 1 } });
+            using (DirectBitmap image = new DirectBitmap(w, h))
             {
                 int white = unchecked((int)0xffffffff); // white
-                for (int y = 0; y < 500; ++y)
-                    for (int x = 0; x < 500; ++x)
-                        image.Bits[500 * y + x] = white;
-                fractal.RenderFractal(image, 16, Fractal.renderLine, finalTransform);
-
+                int black = unchecked((int)0xff000000); // black
                 int red = unchecked((int)0xffff0000); // red
-                // Primary spiral
-                ImProc.DrawSpiral(150, 250, Math.PI / 2, 100 * 1 / 3.0, 40 * Math.PI, Math.PI / 2, Math.PI / 512, 1.0 / 16.0, red, image);
-                ImProc.DrawSpiral(350, 250, -Math.PI / 2, 100 * 2 / 3.0, 40 * Math.PI, Math.PI / 2, Math.PI / 512, 1.0 / 16.0, red, image);
-
-                // Secondary spirals
                 int blue = unchecked((int)0xff0000ff); // blue
-                ImProc.DrawSpiral(250, 150, Math.PI / 2, 100 / 3.0, 40 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, blue, image);
-                ImProc.DrawSpiral(250, 150, 3 * Math.PI / 4, 100 / 3.0, 40 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, blue, image);
-                ImProc.DrawSpiral(250, 150, Math.PI, 100 / 3.0, 40 * Math.PI, 3 * Math.PI / 8, Math.PI / 512, 1.0 / 16.0, blue, image);
+
+                // Initialize the image with white
+                for (int y = 0; y < h; ++y)
+                    for (int x = 0; x < w; ++x)
+                        image.Bits[w * y + x] = white;
+
+                fractal.RenderFractal(image, 18, Fractal.renderLine, finalTransform, black);
+                fractal.RenderFractal(image, 0, Fractal.renderPrimarySpirals, finalTransform, red);
+                for (int i = 0; i < 3; ++i)
+                    fractal.RenderFractal(image, i, Fractal.renderSecondarySpirals, finalTransform, blue);
 
                 IO.SaveImage(image, @"C:\Users\info\Desktop\fractal.bmp");
             }
