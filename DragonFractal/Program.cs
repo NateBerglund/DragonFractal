@@ -21,15 +21,17 @@ namespace DragonFractal
             fractal.IFS.Add(Rot45 * Scale * Translate);
             fractal.IFS.Add(Rot135 * Scale * Translate);
             int sf = 256;
-            int w = 3 * sf;
-            int h = 2 * sf;
-            var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4.0 * sf / 3.0 }, { 0, sf, sf / 3.0 }, { 0, 0, 1 } });
-            using (DirectBitmap image = new DirectBitmap(w, h))
+            int w = 3 * sf + 4;
+            int h = 2 * sf + 4;
+            var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4 * sf / 3 + 2 }, { 0, sf, sf / 3 + 2 }, { 0, 0, 1 } });
+            using (DirectBitmap image = new DirectBitmap(w, h),
+                image2 = new DirectBitmap(w, h))
             {
                 int white = unchecked((int)0xffffffff); // white
                 int black = unchecked((int)0xff000000); // black
                 int red = unchecked((int)0xffff0000); // red
                 int blue = unchecked((int)0xff0000ff); // blue
+                //int green = unchecked((int)0xff00ff00); // green
 
                 // Initialize the image with white
                 for (int y = 0; y < h; ++y)
@@ -37,11 +39,16 @@ namespace DragonFractal
                         image.Bits[w * y + x] = white;
 
                 fractal.RenderFractal(image, 18, Fractal.renderLine, finalTransform, black);
+                ImProc.BWBoundary(image, image2);
+                fractal.ReferenceImage = image2;
+
+                //fractal.RenderFractal(image, 17, Fractal.renderLine, finalTransform * fractal.IFS[0], green);
                 fractal.RenderFractal(image, 0, Fractal.renderPrimarySpirals, finalTransform, red);
-                for (int i = 0; i < 3; ++i)
-                    fractal.RenderFractal(image, i, Fractal.renderSecondarySpirals, finalTransform, blue);
+                for (int i = 0; i < 10; ++i)
+                    fractal.RenderFractal(image, i, fractal.renderSecondarySpirals, finalTransform, blue);
 
                 IO.SaveImage(image, @"C:\Users\info\Desktop\fractal.bmp");
+                //IO.SaveImage(image2, @"C:\Users\info\Desktop\fractalborder.bmp");
             }
         }
     }

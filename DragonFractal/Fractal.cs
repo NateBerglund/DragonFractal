@@ -20,6 +20,12 @@ namespace DragonFractal
         public List<Matrix<double>> IFS;
 
         /// <summary>
+        /// Image to use for reference. Can be used by base unit drawing functions
+        /// to selectively suppress drawing.
+        /// </summary>
+        public DirectBitmap ReferenceImage = null;
+
+        /// <summary>
         /// Fractal rendering function
         /// </summary>
         /// <param name="image">Image to render fractal onto</param>
@@ -30,8 +36,13 @@ namespace DragonFractal
         public void RenderFractal(DirectBitmap image, int nIterations, Action<Matrix<double>, DirectBitmap, int> renderUnit, Matrix<double> transform, int color)
         {
             if (nIterations > 0)
-                foreach (Matrix<double> fracFunc in IFS)
+            {
+                for (int i = 0; i < IFS.Count; ++i)
+                {
+                    Matrix<double> fracFunc = IFS[i];
                     RenderFractal(image, nIterations - 1, renderUnit, transform * fracFunc, color);
+                }
+            }
             else
                 renderUnit(transform, image, color);
         }
@@ -82,15 +93,46 @@ namespace DragonFractal
         /// <param name="image">Image upon which to render the spirals</param>
         /// <param name="color">Color to use</param>
         /// <param name="color">Color to use</param>
-        public static void renderSecondarySpirals(Matrix<double> transform, DirectBitmap image, int color)
-        {
+        public void renderSecondarySpirals(Matrix<double> transform, DirectBitmap image, int color)
+        {    
             Vector<double> origin = DenseVector.OfArray(new double[] { 0.0, 0.0, 1.0 });
             Vector<double> originT = transform * origin;
+            // NOTE: Second spiral originating at pointB is not strictly necessary
+            // (it will be constructed as a copy in another iteration). We only include
+            // it so we can extend the theta bounds farther than they would otherwise go).
+            Vector<double> pointB = DenseVector.OfArray(new double[] { -0.5, 0.5, 1.0 });
+            Vector<double> pointBT = transform * pointB;
             double scaleFactor = Math.Sqrt(transform.SubMatrix(0, 2, 0, 2).Determinant());
             Vector<double> xBasis = DenseVector.OfArray(new double[] { 1.0, 0.0, 0.0 }); // make 3rd coordinate zero so translation is ignored
             Vector<double> xBasisT = transform * xBasis;
             double theta = Math.Atan2(xBasisT[1], xBasisT[0]);
-            ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI / 2, scaleFactor * 1.0 / 2.0, 6 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, color, image);
+            // Suppress rendering if the origin is not a boundary pixel of the dragon fractal
+            bool render = true;
+            if (null != ReferenceImage)
+            {
+                int x = (int)(originT[0] / originT[2] + 0.5);
+                int y = (int)(originT[1] / originT[2] + 0.5);
+                if (x >= 0 && x < ReferenceImage.Width && y >= 0 && y < ReferenceImage.Height)
+                {
+                    if ((ReferenceImage.Bits[ReferenceImage.Width * y + x] & 0x00ffffff) == 0)
+                        render = false; 
+                }
+            }
+            if (render)
+                ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI / 2, scaleFactor * 1.0 / 2.0, 6 * Math.PI, 0, Math.PI / 512, 1.0 / 16.0, color, image);
+            render = true;
+            if (null != ReferenceImage)
+            {
+                int x = (int)(pointBT[0] / pointBT[2] + 0.5);
+                int y = (int)(pointBT[1] / pointBT[2] + 0.5);
+                if (x >= 0 && x < ReferenceImage.Width && y >= 0 && y < ReferenceImage.Height)
+                {
+                    if ((ReferenceImage.Bits[ReferenceImage.Width * y + x] & 0x00ffffff) == 0)
+                        render = false;
+                }
+            }
+            if (render)
+                ImProc.DrawSpiral(pointBT[0] / pointBT[2], pointBT[1] / pointBT[2], theta, scaleFactor * 1.0 / 4.0, 6 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, color, image);
         }
     }
 }

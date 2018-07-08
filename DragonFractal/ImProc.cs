@@ -809,6 +809,50 @@ namespace DragonFractal
             }
         }
 
+        /// <summary>
+        /// Simple boundary detection. Render in white all pixels where any
+        /// neighbors differed from the pixel at the center.
+        /// </summary>
+        /// <param name="inputImage">Original image</param>
+        /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
+        public static void BWBoundary(DirectBitmap inputImage, DirectBitmap destinationImage)
+        {
+            int w = inputImage.Width;
+            int h = inputImage.Height;
+            if (destinationImage.Width != w || destinationImage.Height != h)
+                throw new Exception("BWBoundary: size of destination image does not match size of input image!");
+
+            int white = unchecked((int)0xffffffff); // white
+            int black = unchecked((int)0xff000000); // black
+
+            // Set image borders to black
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; x += w - 1)
+                    destinationImage.Bits[w * y + x] = black;
+            for (int y = 0; y < h; y += h - 1)
+                for (int x = 0; x < w; ++x)
+                    destinationImage.Bits[w * y + x] = black;
+
+            for (int y = 1; y < h - 1; ++y)
+            {
+                for (int x = 1; x < w - 1; ++x)
+                {
+                    int cntr = inputImage.Bits[w * y + x];
+                    if (inputImage.Bits[w * (y - 1) + x - 1] == cntr &&
+                        inputImage.Bits[w * (y - 1) + x] == cntr &&
+                        inputImage.Bits[w * (y - 1) + x + 1] == cntr &&
+                        inputImage.Bits[w * y + x - 1] == cntr &&
+                        inputImage.Bits[w * y + x + 1] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x - 1] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x + 1] == cntr)
+                        destinationImage.Bits[w * y + x] = black;
+                    else
+                        destinationImage.Bits[w * y + x] = white;
+                }
+            }
+        }
+
         #endregion Binary Morph Ops
     }
 }
