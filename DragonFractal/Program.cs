@@ -25,7 +25,8 @@ namespace DragonFractal
             int h = 2 * sf + 4;
             var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4 * sf / 3 + 2 }, { 0, sf, sf / 3 + 2 }, { 0, 0, 1 } });
             using (DirectBitmap image = new DirectBitmap(w, h),
-                image2 = new DirectBitmap(w, h))
+                borderImage = new DirectBitmap(w, h),
+                thickImage = new DirectBitmap(w, h))
             {
                 int white = unchecked((int)0xffffffff); // white
                 int black = unchecked((int)0xff000000); // black
@@ -39,16 +40,18 @@ namespace DragonFractal
                         image.Bits[w * y + x] = white;
 
                 fractal.RenderFractal(image, 18, Fractal.renderLine, finalTransform, black);
-                ImProc.BWBoundary(image, image2);
-                fractal.ReferenceImage = image2;
+                ImProc.BWBoundary(image, borderImage);
+                fractal.ReferenceImage = borderImage;
+                fractal.AuxImage = thickImage;
 
                 //fractal.RenderFractal(image, 17, Fractal.renderLine, finalTransform * fractal.IFS[0], green);
-                fractal.RenderFractal(image, 0, Fractal.renderPrimarySpirals, finalTransform, red);
+                fractal.RenderFractal(image, 0, Fractal.renderPrimarySpirals, finalTransform, blue);
+                fractal.RenderFractal(thickImage, 0, Fractal.renderPrimarySpirals, finalTransform, blue);
                 for (int i = 0; i < 10; ++i)
                     fractal.RenderFractal(image, i, fractal.renderSecondarySpirals, finalTransform, blue);
 
-                IO.SaveImage(image, @"C:\Users\info\Desktop\fractal.bmp");
-                //IO.SaveImage(image2, @"C:\Users\info\Desktop\fractalborder.bmp");
+                IO.SaveImage(thickImage, @"C:\Users\info\Desktop\fractal.bmp");
+                //IO.SaveImage(borderImage, @"C:\Users\info\Desktop\fractalborder.bmp");
             }
         }
     }

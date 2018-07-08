@@ -28,6 +28,33 @@ namespace DragonFractal
         }
 
         /// <summary>
+        /// Determines if a single point can be drawn on an image (pixel that it would
+        /// cover and 4-connected neighbors are equal to the background color).
+        /// No subpixel sampling is used.
+        /// </summary>
+        /// <param name="x">x-coordinate of the point to draw</param>
+        /// <param name="y">y-coordinate of the point to draw</param>
+        /// <param name="backgColor">Expected background color</param>
+        /// <param name="image">Image to draw the point onto</param>
+        /// <returns>True if the point can be drawn without rendering over something else or being outside of the image</returns>
+        public static bool IsPtFree(double x, double y, int backgColor, DirectBitmap image)
+        {
+            bool isFree = false;
+            int xi = (int)(x + 0.5);
+            int yi = (int)(y + 0.5);
+            if (xi >= 1 && xi < image.Width - 1 && yi >= 1 && yi < image.Height - 1)
+            {
+                if (backgColor == image.Bits[image.Width * (yi - 1) + xi] &&
+                    backgColor == image.Bits[image.Width * (yi + 1) + xi] &&
+                    backgColor == image.Bits[image.Width * yi + xi] &&
+                    backgColor == image.Bits[image.Width * yi + xi + 1] &&
+                    backgColor == image.Bits[image.Width * yi + xi - 1])
+                    isFree = true;
+            }
+            return isFree;
+        }
+
+        /// <summary>
         /// Draws a line on an image. No subpixel sampling is used.
         /// </summary>
         /// <param name="x1">x-coordinate of the first endpoint of the line</param>
@@ -56,6 +83,42 @@ namespace DragonFractal
                 for (int yi = yStart; yi <= yEnd; ++yi)
                     DrawPt(x1 + (yi - y1) * (x2 - x1) / (y2 - y1), yi, color, image);
             }
+        }
+
+        /// <summary>
+        /// Determines if a line can be drawn on an image (all pixels that it would
+        /// cover are equal to the background color). No subpixel sampling is used.
+        /// </summary>
+        /// <param name="x1">x-coordinate of the first endpoint of the line</param>
+        /// <param name="y1">y-coordinate of the first endpoint of the line</param>
+        /// <param name="x2">x-coordinate of the second endpoint of the line</param>
+        /// <param name="y2">y-coordinate of the second endpoint of the line</param>
+        /// <param name="backgColor">Expected background color</param>
+        /// <param name="image">Image where the line is intended to be drawn onto</param>
+        /// <returns>True if the line can be drawn without rendering over something else or being outside of the image</returns>
+        public static bool IsLineFree(double x1, double y1, double x2, double y2, int backgColor, DirectBitmap image)
+        {
+            int x1i = (int)(x1 + 0.5);
+            int y1i = (int)(y1 + 0.5);
+            int x2i = (int)(x2 + 0.5);
+            int y2i = (int)(y2 + 0.5);
+            if (Math.Abs(x2 - x1) > Math.Abs(y2 - y1))
+            {
+                int xStart = Math.Max(0, Math.Min(x1i, x2i));
+                int xEnd = Math.Min(image.Width - 1, Math.Max(x1i, x2i));
+                for (int xi = xStart; xi <= xEnd; ++xi)
+                    if (!IsPtFree(xi, y1 + (xi - x1) * (y2 - y1) / (x2 - x1), backgColor, image))
+                        return false;
+            }
+            else
+            {
+                int yStart = Math.Max(0, Math.Min(y1i, y2i));
+                int yEnd = Math.Min(image.Height - 1, Math.Max(y1i, y2i));
+                for (int yi = yStart; yi <= yEnd; ++yi)
+                    if (!IsPtFree(x1 + (yi - y1) * (x2 - x1) / (y2 - y1), yi, backgColor, image))
+                        return false;
+            }
+            return true;
         }
 
         /// <summary>
@@ -90,6 +153,80 @@ namespace DragonFractal
                 prevX = curX;
                 prevY = curY;
             }
+        }
+
+        /// <summary>
+        /// Draws a spiral on an image. No subpixel sampling is used. Extents of the spiral
+        /// are determined by continuing the spiral until it hits the boundary of the image
+        /// or a nonzero pixel.
+        /// </summary>
+        /// <param name="x">x-coordiante of the center of the spiral</param>
+        /// <param name="y">y-coordinate of the center of the spiral</param>
+        /// <param name="thetaInit">Inital theta of the spiral</param>
+        /// <param name="rInit">Intial radius of the spiral</param>
+        /// <param name="thetaStep">Step size in theta</param>
+        /// <param name="scalePerRev">Amount the spiral will scale for each revolution</param>
+        /// <param name="color">Color to give the spiral</param>
+        /// <param name="image">Image to draw the spiral onto</param>
+        /// <param name="thetaPlusSpan">Computed thetaPlusSpan for the spiral being rendered</param>
+        /// <param name="thetaMinusSpan">Computed thetaMinusSpan for the spiral being rendered</param>
+        public static void DrawSpiral(double x, double y, double thetaInit, double rInit, double thetaStep, double scalePerRev, int color, DirectBitmap image, out double thetaPlusSpan, out double thetaMinusSpan)
+        {
+            double prevX = double.NaN;
+            double prevY = double.NaN;
+            // Determine thetaPlusSpan
+            thetaPlusSpan = 0;
+            bool keepLooping = true;
+            double baseTheta = 0;
+            while (keepLooping)
+            {
+                double theta = thetaInit + baseTheta;
+                double revs = baseTheta / (2.0 * Math.PI);
+                double alpha = Math.Log(scalePerRev);
+                double r = rInit * Math.Exp(alpha * revs);
+                double curX = x + r * Math.Cos(theta);
+                double curY = y + r * Math.Sin(theta);
+                if (!double.IsNaN(prevX) && !double.IsNaN(prevY))
+                {
+                    if (!IsLineFree(prevX, prevY, curX, curY, unchecked((int)0xff000000), image))
+                    {
+                        keepLooping = false;
+                        thetaPlusSpan = baseTheta - thetaStep;
+                    }
+                }
+                prevX = curX;
+                prevY = curY;
+                baseTheta += thetaStep;
+            }
+            prevX = double.NaN;
+            prevY = double.NaN;
+            // Determine thetaMinusSpan
+            thetaMinusSpan = 0;
+            keepLooping = true;
+            baseTheta = 0;
+            while (keepLooping)
+            {
+                double theta = thetaInit + baseTheta;
+                double revs = baseTheta / (2.0 * Math.PI);
+                double alpha = Math.Log(scalePerRev);
+                double r = rInit * Math.Exp(alpha * revs);
+                double curX = x + r * Math.Cos(theta);
+                double curY = y + r * Math.Sin(theta);
+                if (!double.IsNaN(prevX) && !double.IsNaN(prevY))
+                {
+                    if (!IsLineFree(prevX, prevY, curX, curY, unchecked((int)0xff000000), image))
+                    {
+                        keepLooping = false;
+                        thetaMinusSpan = -(baseTheta + thetaStep);
+                    }
+                }
+                prevX = curX;
+                prevY = curY;
+                baseTheta -= thetaStep;
+            }
+
+            if (thetaMinusSpan > 0 || thetaPlusSpan > 0)
+                DrawSpiral(x, y, thetaInit, rInit, thetaPlusSpan, thetaMinusSpan, thetaStep, scalePerRev, color, image);
         }
 
         #endregion Drawing

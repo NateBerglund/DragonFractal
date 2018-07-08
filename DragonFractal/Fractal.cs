@@ -26,6 +26,12 @@ namespace DragonFractal
         public DirectBitmap ReferenceImage = null;
 
         /// <summary>
+        /// Auxillary image to use for drawing. Can be used by base unit drawing functions
+        /// to selectively suppress drawing.
+        /// </summary>
+        public DirectBitmap AuxImage = null;
+
+        /// <summary>
         /// Fractal rendering function
         /// </summary>
         /// <param name="image">Image to render fractal onto</param>
@@ -119,20 +125,15 @@ namespace DragonFractal
                 }
             }
             if (render)
-                ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI / 2, scaleFactor * 1.0 / 2.0, 6 * Math.PI, 0, Math.PI / 512, 1.0 / 16.0, color, image);
-            render = true;
-            if (null != ReferenceImage)
             {
-                int x = (int)(pointBT[0] / pointBT[2] + 0.5);
-                int y = (int)(pointBT[1] / pointBT[2] + 0.5);
-                if (x >= 0 && x < ReferenceImage.Width && y >= 0 && y < ReferenceImage.Height)
+                double thetaPlusSpan, thetaMinusSpan;
+                ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI, scaleFactor * 1.0 / 4.0, Math.PI / 512, 1.0 / 16.0, color, image, out thetaPlusSpan, out thetaMinusSpan);
+                if (null != AuxImage && (thetaMinusSpan > 0 || thetaPlusSpan > 0))
                 {
-                    if ((ReferenceImage.Bits[ReferenceImage.Width * y + x] & 0x00ffffff) == 0)
-                        render = false;
+                    for (double t = -Math.PI / 32; t <= Math.PI / 32; t += Math.PI / 2048)
+                    ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI + t, scaleFactor * 1.0 / 4.0, thetaPlusSpan, thetaMinusSpan, Math.PI / 512, 1.0 / 16.0, color, AuxImage);
                 }
             }
-            if (render)
-                ImProc.DrawSpiral(pointBT[0] / pointBT[2], pointBT[1] / pointBT[2], theta, scaleFactor * 1.0 / 4.0, 6 * Math.PI, Math.PI / 4, Math.PI / 512, 1.0 / 16.0, color, image);
         }
     }
 }
