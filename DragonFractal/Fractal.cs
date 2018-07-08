@@ -39,18 +39,19 @@ namespace DragonFractal
         /// <param name="renderUnit">Function that renders a single basic unit that IFS will be applied to recursively</param>
         /// <param name="transform">Matrix that transforms from the fractal's coordinate system to the coordinate system of the image</param>
         /// <param name="color">Base color to use for rendering</param>
-        public void RenderFractal(DirectBitmap image, int nIterations, Action<Matrix<double>, DirectBitmap, int> renderUnit, Matrix<double> transform, int color)
+        /// <param name="secondaryColor">Color to render onto auxilliary image (not used)</param>
+        public void RenderFractal(DirectBitmap image, int nIterations, Action<Matrix<double>, DirectBitmap, int, int> renderUnit, Matrix<double> transform, int color, int secondaryColor)
         {
             if (nIterations > 0)
             {
                 for (int i = 0; i < IFS.Count; ++i)
                 {
                     Matrix<double> fracFunc = IFS[i];
-                    RenderFractal(image, nIterations - 1, renderUnit, transform * fracFunc, color);
+                    RenderFractal(image, nIterations - 1, renderUnit, transform * fracFunc, color, secondaryColor);
                 }
             }
             else
-                renderUnit(transform, image, color);
+                renderUnit(transform, image, color, secondaryColor);
         }
 
         /// <summary>
@@ -59,7 +60,8 @@ namespace DragonFractal
         /// <param name="transform">Coordinate transform to apply</param>
         /// <param name="image">Image upon which to render the line</param>
         /// <param name="color">Color to use</param>
-        public static void renderLine(Matrix<double> transform, DirectBitmap image, int color)
+        /// <param name="secondaryColor">Color to render onto auxilliary image (not used)</param>
+        public static void renderLine(Matrix<double> transform, DirectBitmap image, int color, int secondaryColor)
         {
             Vector<double> pointA = DenseVector.OfArray(new double[] { -1.0, 1.0, 1.0 });
             Vector<double> pointB = DenseVector.OfArray(new double[] { 1.0, 1.0, 1.0 });
@@ -76,7 +78,8 @@ namespace DragonFractal
         /// <param name="transform">Coordinate transform to apply</param>
         /// <param name="image">Image upon which to render the spirals</param>
         /// <param name="color">Color to use</param>
-        public static void renderPrimarySpirals(Matrix<double> transform, DirectBitmap image, int color)
+        /// <param name="secondaryColor">Color to render onto auxilliary image (not used)</param>
+        public static void renderPrimarySpirals(Matrix<double> transform, DirectBitmap image, int color, int secondaryColor)
         {
             Vector<double> pointA = DenseVector.OfArray(new double[] { -1.0, 1.0, 1.0 });
             Vector<double> pointB = DenseVector.OfArray(new double[] { 1.0, 1.0, 1.0 });
@@ -99,7 +102,8 @@ namespace DragonFractal
         /// <param name="image">Image upon which to render the spirals</param>
         /// <param name="color">Color to use</param>
         /// <param name="color">Color to use</param>
-        public void renderSecondarySpirals(Matrix<double> transform, DirectBitmap image, int color)
+        /// <param name="secondaryColor">Color to render onto auxilliary image</param>
+        public void renderSecondarySpirals(Matrix<double> transform, DirectBitmap image, int color, int secondaryColor)
         {    
             Vector<double> origin = DenseVector.OfArray(new double[] { 0.0, 0.0, 1.0 });
             Vector<double> originT = transform * origin;
@@ -129,10 +133,7 @@ namespace DragonFractal
                 double thetaPlusSpan, thetaMinusSpan;
                 ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI, scaleFactor * 1.0 / 4.0, Math.PI / 512, 1.0 / 16.0, color, image, out thetaPlusSpan, out thetaMinusSpan);
                 if (null != AuxImage && (thetaMinusSpan > 0 || thetaPlusSpan > 0))
-                {
-                    for (double t = -Math.PI / 32; t <= Math.PI / 32; t += Math.PI / 2048)
-                    ImProc.DrawSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI + t, scaleFactor * 1.0 / 4.0, thetaPlusSpan, thetaMinusSpan, Math.PI / 512, 1.0 / 16.0, color, AuxImage);
-                }
+                    ImProc.DrawThickSpiral(originT[0] / originT[2], originT[1] / originT[2], theta + Math.PI, scaleFactor * 1.0 / 4.0, thetaPlusSpan, thetaMinusSpan, Math.PI / 512, 1.0 / 16.0, 0.1, secondaryColor, AuxImage);
             }
         }
     }

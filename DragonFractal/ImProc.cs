@@ -156,6 +156,153 @@ namespace DragonFractal
         }
 
         /// <summary>
+        /// Draws a thick spiral on an image. No subpixel sampling is used.
+        /// </summary>
+        /// <param name="x">x-coordiante of the center of the spiral</param>
+        /// <param name="y">y-coordinate of the center of the spiral</param>
+        /// <param name="thetaInit">Inital theta of the spiral</param>
+        /// <param name="rInit">Intial radius of the spiral</param>
+        /// <param name="thetaPlusSpan">Span of the spiral in theta</param>
+        /// <param name="thetaMinusSpan">Span of the spiral backwards in theta</param>
+        /// <param name="thetaStep">Step size in theta</param>
+        /// <param name="scalePerRev">Amount the spiral will scale for each revolution</param>
+        /// <param name="relThickness">Relative thickness (ratio of the radius at the current point)</param>
+        /// <param name="color">Color to give the spiral</param>
+        /// <param name="image">Image to draw the spiral onto</param>
+        public static void DrawThickSpiral(double x, double y, double thetaInit, double rInit, double thetaPlusSpan, double thetaMinusSpan, double thetaStep, double scalePerRev, double relThickness, int color, DirectBitmap image)
+        {
+            double prevX = double.NaN;
+            double prevY = double.NaN;
+            for (double baseTheta = -thetaMinusSpan; baseTheta < thetaPlusSpan; baseTheta += thetaStep)
+            {
+                double theta = thetaInit + baseTheta;
+                double revs = baseTheta / (2.0 * Math.PI);
+                double alpha = Math.Log(scalePerRev);
+                double r = rInit * Math.Exp(alpha * revs);
+                double curX = x + r * Math.Cos(theta);
+                double curY = y + r * Math.Sin(theta);
+                if (!double.IsNaN(prevX) && !double.IsNaN(prevY))
+                {
+                    double halfWidth = 0.5 * relThickness * r;
+                    double dX = r * (alpha * Math.Cos(theta) - 2.0 * Math.PI * Math.Sin(theta));
+                    double dY = r * (alpha * Math.Sin(theta) + 2.0 * Math.PI * Math.Cos(theta));
+                    double mag = Math.Sqrt(dX * dX + dY * dY);
+                    dX /= mag;
+                    dY /= mag;
+                    int x1i = (int)(prevX + 0.5);
+                    int y1i = (int)(prevY + 0.5);
+                    int x2i = (int)(curX + 0.5);
+                    int y2i = (int)(curY + 0.5);
+                    if (Math.Abs(curX - prevX) > Math.Abs(curY - prevY))
+                    {
+                        int xStart = Math.Max(0, Math.Min(x1i, x2i));
+                        int xEnd = Math.Min(image.Width - 1, Math.Max(x1i, x2i));
+                        for (int xi = xStart; xi <= xEnd; ++xi)
+                        {
+                            DrawLine(xi + halfWidth * dY, prevY + (xi - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, xi - halfWidth * dY, prevY + (xi - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                            if (xi < xEnd)
+                            {
+                                DrawLine((xi + 1.0 / 3.0) + halfWidth * dY, prevY + ((xi + 1.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, (xi + 1.0 / 3.0) - halfWidth * dY, prevY + ((xi + 1.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                                DrawLine((xi + 2.0 / 3.0) + halfWidth * dY, prevY + ((xi + 2.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, (xi + 2.0 / 3.0) - halfWidth * dY, prevY + ((xi + 2.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int yStart = Math.Max(0, Math.Min(y1i, y2i));
+                        int yEnd = Math.Min(image.Height - 1, Math.Max(y1i, y2i));
+                        for (int yi = yStart; yi <= yEnd; ++yi)
+                        {
+                            DrawLine(prevX + (yi - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, yi - halfWidth * dX, prevX + (yi - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, yi + halfWidth * dX, color, image);
+                            if (yi < yEnd)
+                            {
+                                DrawLine(prevX + ((yi + 1.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, (yi + 1.0 / 3.0) - halfWidth * dX, prevX + ((yi + 1.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, (yi + 1.0 / 3.0) + halfWidth * dX, color, image);
+                                DrawLine(prevX + ((yi + 2.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, (yi + 2.0 / 3.0) - halfWidth * dX, prevX + ((yi + 2.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, (yi + 2.0 / 3.0) + halfWidth * dX, color, image);
+                            }
+                        }
+                    }
+                }
+                prevX = curX;
+                prevY = curY;
+            }
+        }
+
+        /// <summary>
+        /// Draws a tapered thick spiral on an image,
+        /// where the thickness shrinks to zero at the endpoints.
+        /// No subpixel sampling is used.
+        /// </summary>
+        /// <param name="x">x-coordiante of the center of the spiral</param>
+        /// <param name="y">y-coordinate of the center of the spiral</param>
+        /// <param name="thetaInit">Inital theta of the spiral</param>
+        /// <param name="rInit">Intial radius of the spiral</param>
+        /// <param name="thetaPlusSpan">Span of the spiral in theta</param>
+        /// <param name="thetaMinusSpan">Span of the spiral backwards in theta</param>
+        /// <param name="thetaStep">Step size in theta</param>
+        /// <param name="scalePerRev">Amount the spiral will scale for each revolution</param>
+        /// <param name="relThickness">Relative thickness (ratio of the radius at the current point)</param>
+        /// <param name="decayParameter">Controls how rapidly the thickness decays towards the endpoints</param>
+        /// <param name="color">Color to give the spiral</param>
+        /// <param name="image">Image to draw the spiral onto</param>
+        public static void DrawTaperedSpiral(double x, double y, double thetaInit, double rInit, double thetaPlusSpan, double thetaMinusSpan, double thetaStep, double scalePerRev, double relThickness, double decayParameter, int color, DirectBitmap image)
+        {
+            double prevX = double.NaN;
+            double prevY = double.NaN;
+            for (double baseTheta = -thetaMinusSpan; baseTheta < thetaPlusSpan; baseTheta += thetaStep)
+            {
+                double theta = thetaInit + baseTheta;
+                double revs = baseTheta / (2.0 * Math.PI);
+                double alpha = Math.Log(scalePerRev);
+                double r = rInit * Math.Exp(alpha * revs);
+                double curX = x + r * Math.Cos(theta);
+                double curY = y + r * Math.Sin(theta);
+                if (!double.IsNaN(prevX) && !double.IsNaN(prevY))
+                {
+                    double halfWidth = 0.5 * relThickness * r * Math.Exp(-Math.Pow(Math.Tan(-0.5 * Math.PI + Math.PI * (baseTheta + thetaMinusSpan) / (thetaPlusSpan + thetaMinusSpan)) * decayParameter, 2));
+                    double dX = r * (alpha * Math.Cos(theta) - 2.0 * Math.PI * Math.Sin(theta));
+                    double dY = r * (alpha * Math.Sin(theta) + 2.0 * Math.PI * Math.Cos(theta));
+                    double mag = Math.Sqrt(dX * dX + dY * dY);
+                    dX /= mag;
+                    dY /= mag;
+                    int x1i = (int)(prevX + 0.5);
+                    int y1i = (int)(prevY + 0.5);
+                    int x2i = (int)(curX + 0.5);
+                    int y2i = (int)(curY + 0.5);
+                    if (Math.Abs(curX - prevX) > Math.Abs(curY - prevY))
+                    {
+                        int xStart = Math.Max(0, Math.Min(x1i, x2i));
+                        int xEnd = Math.Min(image.Width - 1, Math.Max(x1i, x2i));
+                        for (int xi = xStart; xi <= xEnd; ++xi)
+                        {
+                            DrawLine(xi + halfWidth * dY, prevY + (xi - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, xi - halfWidth * dY, prevY + (xi - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                            if (xi < xEnd)
+                            {
+                                DrawLine((xi + 1.0 / 3.0) + halfWidth * dY, prevY + ((xi + 1.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, (xi + 1.0 / 3.0) - halfWidth * dY, prevY + ((xi + 1.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                                DrawLine((xi + 2.0 / 3.0) + halfWidth * dY, prevY + ((xi + 2.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) - halfWidth * dX, (xi + 2.0 / 3.0) - halfWidth * dY, prevY + ((xi + 2.0 / 3.0) - prevX) * (curY - prevY) / (curX - prevX) + halfWidth * dX, color, image);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int yStart = Math.Max(0, Math.Min(y1i, y2i));
+                        int yEnd = Math.Min(image.Height - 1, Math.Max(y1i, y2i));
+                        for (int yi = yStart; yi <= yEnd; ++yi)
+                        {
+                            DrawLine(prevX + (yi - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, yi - halfWidth * dX, prevX + (yi - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, yi + halfWidth * dX, color, image);
+                            if (yi < yEnd)
+                            {
+                                DrawLine(prevX + ((yi + 1.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, (yi + 1.0 / 3.0) - halfWidth * dX, prevX + ((yi + 1.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, (yi + 1.0 / 3.0) + halfWidth * dX, color, image);
+                                DrawLine(prevX + ((yi + 2.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) + halfWidth * dY, (yi + 2.0 / 3.0) - halfWidth * dX, prevX + ((yi + 2.0 / 3.0) - prevY) * (curX - prevX) / (curY - prevY) - halfWidth * dY, (yi + 2.0 / 3.0) + halfWidth * dX, color, image);
+                            }
+                        }
+                    }
+                }
+                prevX = curX;
+                prevY = curY;
+            }
+        }
+
+        /// <summary>
         /// Draws a spiral on an image. No subpixel sampling is used. Extents of the spiral
         /// are determined by continuing the spiral until it hits the boundary of the image
         /// or a nonzero pixel.
@@ -191,7 +338,7 @@ namespace DragonFractal
                     if (!IsLineFree(prevX, prevY, curX, curY, unchecked((int)0xff000000), image))
                     {
                         keepLooping = false;
-                        thetaPlusSpan = baseTheta - thetaStep;
+                        thetaPlusSpan = baseTheta;
                     }
                 }
                 prevX = curX;
@@ -217,7 +364,7 @@ namespace DragonFractal
                     if (!IsLineFree(prevX, prevY, curX, curY, unchecked((int)0xff000000), image))
                     {
                         keepLooping = false;
-                        thetaMinusSpan = -(baseTheta + thetaStep);
+                        thetaMinusSpan = -baseTheta;
                     }
                 }
                 prevX = curX;
@@ -227,6 +374,30 @@ namespace DragonFractal
 
             if (thetaMinusSpan > 0 || thetaPlusSpan > 0)
                 DrawSpiral(x, y, thetaInit, rInit, thetaPlusSpan, thetaMinusSpan, thetaStep, scalePerRev, color, image);
+        }
+
+        /// <summary>
+        /// Draws a closed contour onto an image
+        /// </summary>
+        /// <param name="xCoords">Array of x-coordinates of the contour</param>
+        /// <param name="yCoords">Array of y-coordinates of the contour</param>
+        /// <param name="color">Color of the contour</param>
+        /// <param name="image">Image to draw onto</param>
+        public static void DrawClosedContour(double[] xCoords, double[] yCoords, int color, DirectBitmap image)
+        {
+            int N = xCoords.Length;
+            if (yCoords.Length != N)
+                throw new Exception("DrawClosedContour: Lengths of xCoords and yCoords do not match!");
+
+            for (int i = 0; i < N; ++i)
+            {
+                int ii = (i + 1) % N;
+                double x1 = xCoords[i];
+                double y1 = yCoords[i];
+                double x2 = xCoords[ii];
+                double y2 = yCoords[ii];
+                DrawLine(x1, y1, x2, y2, color, image);
+            }
         }
 
         #endregion Drawing
@@ -369,6 +540,93 @@ namespace DragonFractal
             }
 
             return retVal;
+        }
+
+        /// <summary>
+        /// Performs a 1-dimensional convolution on 1-d input data, returning the result in the output.
+        /// </summary>
+        /// <param name="input">Input array</param>
+        /// <param name="kernel">Convolution kernel</param>
+        /// <param name="shape">Controls the size of the output returned. Options are:<br/>
+        /// 0: 'valid' - Return only parts of the convolution that are computed without requiring padding at the boundary.<br/>
+        /// 1: 'same' - Return the central part of the convolution, which is the same size as the input.<br/>
+        /// 2: 'full' - Return the full 1-d convolution
+        /// </param>
+        /// <param name="origin">
+        /// Element of the kernel to be considered the "origin" (applies when shape == 1).
+        /// If -1 is passed in (default value) this number is automatically calculated as (kernel.Length-1)/2
+        /// </param>
+        /// <param name="boundaryCondition">Specifies how the boundary pixels will be padded (applies when shape > 0). Options are:<br/>
+        /// 0: Default value. Pad with the constant value specified in boundaryValue (default = 0.0)
+        /// 1: Periodic boundary conditions
+        /// 2: Reflect the data at the boundary
+        /// </param>
+        /// <param name="boundaryValue">Value to use for padding the boundary (if boundaryCondition == 0)</param>
+        /// <returns>Result of the convolution</returns>
+        public static double[] Convolve1D(double[] input, double[] kernel, int shape, int origin = -1, int boundaryCondition = 0, double boundaryValue = 0.0)
+        {
+            // initialize some constants
+            int imH = input.Length;
+
+            double[] origInput = null;
+            int offset = 0; // offset to origInput within new input
+            switch (shape)
+            {
+                case 1:
+                    // Pad input sufficiently for same-sized output
+                    origInput = input;
+                    input = new double[imH + kernel.Length - 1];
+                    if (-1 == origin)
+                        origin = (kernel.Length - 1) / 2;
+                    offset = kernel.Length - 1 - origin;
+                    break;
+                case 2:
+                    // Pad input sufficiently for full-sized output
+                    origInput = input;
+                    input = new double[imH + 2 * (kernel.Length - 1)];
+                    offset = kernel.Length - 1;
+                    break;
+                default: // case 0, nothing to do
+                    break;
+            }
+            int offsetY = 0;
+            offsetY = offset;
+
+            if (null != origInput)
+            {
+                int hoi = origInput.Length;
+                int hi = input.Length;
+                int nk = kernel.Length;
+                // Copy original input into appropriate section of new input
+                for (int y = 0; y < hoi; ++y)
+                    input[offsetY + y] = origInput[y];
+                // Fill in the padded elements
+                switch (boundaryCondition)
+                {
+                    case 0: // Pad with the constant value specified in boundaryValue (default = 0.0)
+                        for (int y = 0; y < offset; ++y)
+                            input[y] = boundaryValue;
+                        for (int y = offset + hoi; y < hi; ++y)
+                            input[y] = boundaryValue;
+                        break;
+                    case 1: // Periodic boundary conditions
+                        for (int y = 0; y < offset; ++y)
+                            input[y] = origInput[(y - offset + hoi) % hoi];
+                        for (int y = offset + hoi; y < hi; ++y)
+                            input[y] = origInput[(y - offset) % hoi];
+                        break;
+                    case 2: // Reflect the data at the boundary
+                        for (int y = 0; y < offset; ++y)
+                            input[y] = origInput[offset - 1 - y];
+                        for (int y = offset + hoi; y < hi; ++y)
+                            input[y] = origInput[2 * (offset + hoi) - 1 - y];
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            return Convolve1D(input, kernel);
         }
 
         /// <summary>
@@ -551,6 +809,32 @@ namespace DragonFractal
         #region Private Helper Functions
 
         /// <summary>
+        /// Helper function to perform a 1-dimensional convolution on 1-d input data, returning the result in the output.
+        /// This function is equivalent to calling Convolve1D(input, kernel, 0), computing only the 'valid' portion of the
+        /// convolution (i.e. those values that are computed without requiring padding at the boundary).<br/>
+        /// </summary>
+        /// <param name="input">Input array</param>
+        /// <param name="kernel">Convolution kernel</param>
+        /// <returns>Result of the convolution</returns>
+        private static double[] Convolve1D(double[] input, double[] kernel)
+        {
+            double[] output = new double[0];
+            int ni = input.Length;
+            int nk = kernel.Length;
+            int no = ni - nk + 1;
+            if (no <= 0)
+                return new double[0];
+            output = new double[no];
+
+            for (int i = 0; i < no; ++i)
+            {
+                for (int j = 0; j < nk; ++j)
+                    output[i] += input[i + nk - 1 - j] * kernel[j];
+            }
+            return output;
+        }
+
+        /// <summary>
         /// Helper function to perform a 1-dimensional convolution on 2-d input data, returning the result in the output.
         /// This function is equivalent to calling Convolve1D(input, kernel, 0), computing only the 'valid' portion of the
         /// convolution (i.e. those values that are computed without requiring padding at the boundary).<br/>
@@ -717,8 +1001,8 @@ namespace DragonFractal
         #region Binary Morph Ops
 
         /// <summary>
-        /// Dilates a binary image by a given kernel (pixels are assumed to be either 0 or 255). Note
-        /// that the boundary is not computed (it will be zeros wherever the full kernel cannot be convolved with the image).
+        /// Dilates a binary image by a given kernel (pixels are assumed to be either 0 or 255).
+        /// Pixels outside of the boundary are assumed to equal zero.
         /// </summary>
         /// <param name="inputImage">Input image</param>
         /// <param name="kernel">Dilation kernel</param>
@@ -733,14 +1017,14 @@ namespace DragonFractal
             int wk = kernel.GetLength(1);
             int hk = kernel.GetLength(0);
 
-            for (int y = rowOrigin; y <= h - hk - rowOrigin; ++y)
+            for (int y = 0; y < h; ++y)
             {
-                for (int x = colOrigin; x <= w - wk - colOrigin; ++x)
+                for (int x = 0; x < w; ++x)
                 {
                     bool found = false;
-                    for (int yofs = -rowOrigin; yofs < hk - rowOrigin; ++yofs)
+                    for (int yofs = Math.Max(-rowOrigin, -y); yofs < Math.Min(hk - rowOrigin, h - y); ++yofs)
                     {
-                        for (int xofs = -colOrigin; xofs < wk - colOrigin; ++xofs)
+                        for (int xofs = Math.Max(-colOrigin, -x); xofs < Math.Min(wk - colOrigin, w - x); ++xofs)
                         {
                             if (kernel[rowOrigin + yofs, colOrigin + xofs] && inputImage[y + yofs, x + xofs] != 0)
                             {
@@ -760,8 +1044,8 @@ namespace DragonFractal
         }
 
         /// <summary>
-        /// Erodes a binary image by a given kernel (pixels are assumed to be either 0 or 255). Note
-        /// that the boundary is not computed (it will be zeros wherever the full kernel cannot be convolved with the image).
+        /// Erodes a binary image by a given kernel (pixels are assumed to be either 0 or 255).
+        /// Pixels outside of the boundary are assumed to equal 255.
         /// </summary>
         /// <param name="inputImage">Input image</param>
         /// <param name="kernel">Dilation kernel</param>
@@ -776,14 +1060,14 @@ namespace DragonFractal
             int wk = kernel.GetLength(1);
             int hk = kernel.GetLength(0);
 
-            for (int y = rowOrigin; y <= h - hk - rowOrigin; ++y)
+            for (int y = 0; y < h; ++y)
             {
-                for (int x = colOrigin; x <= w - wk - colOrigin; ++x)
+                for (int x = 0; x < w; ++x)
                 {
                     bool found = false;
-                    for (int yofs = -rowOrigin; yofs < hk - rowOrigin; ++yofs)
+                    for (int yofs = Math.Max(-rowOrigin, -y); yofs < Math.Min(hk - rowOrigin, h - y); ++yofs)
                     {
-                        for (int xofs = -colOrigin; xofs < wk - colOrigin; ++xofs)
+                        for (int xofs = Math.Max(-colOrigin, -x); xofs < Math.Min(wk - colOrigin, w - x); ++xofs)
                         {
                             if (kernel[rowOrigin + yofs, colOrigin + xofs] && inputImage[y + yofs, x + xofs] == 0)
                             {
@@ -990,6 +1274,352 @@ namespace DragonFractal
             }
         }
 
+        /// <summary>
+        /// Simple boundary detection. Render in white all pixels where any
+        /// neighbors differed from the pixel at the center.
+        /// </summary>
+        /// <param name="inputImage">Original image</param>
+        /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
+        /// <param name="restrictColor">Only label as boundary pixels, pixels which are this color</param>
+        public static void BWBoundary(DirectBitmap inputImage, DirectBitmap destinationImage, int restrictColor)
+        {
+            int w = inputImage.Width;
+            int h = inputImage.Height;
+            if (destinationImage.Width != w || destinationImage.Height != h)
+                throw new Exception("BWBoundary: size of destination image does not match size of input image!");
+
+            int white = unchecked((int)0xffffffff); // white
+            int black = unchecked((int)0xff000000); // black
+
+            // Set image borders to black
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; x += w - 1)
+                    destinationImage.Bits[w * y + x] = black;
+            for (int y = 0; y < h; y += h - 1)
+                for (int x = 0; x < w; ++x)
+                    destinationImage.Bits[w * y + x] = black;
+
+            for (int y = 1; y < h - 1; ++y)
+            {
+                for (int x = 1; x < w - 1; ++x)
+                {
+                    int cntr = inputImage.Bits[w * y + x];
+                    if ((inputImage.Bits[w * (y - 1) + x - 1] == cntr &&
+                        inputImage.Bits[w * (y - 1) + x] == cntr &&
+                        inputImage.Bits[w * (y - 1) + x + 1] == cntr &&
+                        inputImage.Bits[w * y + x - 1] == cntr &&
+                        inputImage.Bits[w * y + x + 1] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x - 1] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x] == cntr &&
+                        inputImage.Bits[w * (y + 1) + x + 1] == cntr) ||
+                        inputImage.Bits[w * y + x] != restrictColor)
+                        destinationImage.Bits[w * y + x] = black;
+                    else
+                        destinationImage.Bits[w * y + x] = white;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Simple boundary detection (4-connected). Render in white all pixels where any
+        /// neighbors differed from the pixel at the center.
+        /// </summary>
+        /// <param name="inputImage">Original image</param>
+        /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
+        /// <param name="restrictColor">Only label as boundary pixels, pixels which are this color</param>
+        public static void BWBoundary4(byte[,] inputImage, byte[,] destinationImage, byte restrictColor)
+        {
+            int w = inputImage.GetLength(1);
+            int h = inputImage.GetLength(0);
+            if (destinationImage.GetLength(1) != w || destinationImage.GetLength(0) != h)
+                throw new Exception("BWBoundary: size of destination image does not match size of input image!");
+
+            // Set image borders to black
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; x += w - 1)
+                    destinationImage[y, x] = 0;
+            for (int y = 0; y < h; y += h - 1)
+                for (int x = 0; x < w; ++x)
+                    destinationImage[y, x] = 0;
+
+            for (int y = 1; y < h - 1; ++y)
+            {
+                for (int x = 1; x < w - 1; ++x)
+                {
+                    int cntr = inputImage[y, x];
+                    if ((inputImage[y - 1, x] == cntr &&
+                        inputImage[y, x - 1] == cntr &&
+                        inputImage[y, x + 1] == cntr &&
+                        inputImage[y + 1, x] == cntr) ||
+                        inputImage[y, x] != restrictColor)
+                        destinationImage[y, x] = 0;
+                    else
+                        destinationImage[y, x] = 255;
+                }
+            }
+        }
+
         #endregion Binary Morph Ops
+
+        #region Contour Following
+
+        /// <summary>
+        /// Extracts a single closed contour from a binary image. It is assumed that
+        /// the contour is only 1 pixel wide, so that the ordering of the pixels
+        /// around the contour is unambiguous. Note that the image is modified in this
+        /// process (contour is replaced with grey).
+        /// </summary>
+        /// <param name="bwImage">Input image of edge pixels</param>
+        /// <param name="xCoords">X-coordinates of the contour</param>
+        /// <param name="yCoords">Y-coordinates of the contour</param>
+        public static void FindClosedContour(byte[,] bwImage, out double[] xCoords, out double[] yCoords)
+        {
+            xCoords = null;
+            yCoords = null;
+
+            int w = bwImage.GetLength(1);
+            int h = bwImage.GetLength(0);
+
+            // Search the image for a nonzero pixel
+            int seedX = -1;
+            int seedY = -1;
+            for (int y = 0; y < h; ++y)
+            {
+                for (int x = 0; x < w; ++x)
+                {
+                    if (bwImage[y, x] != 0)
+                    {
+                        seedX = x;
+                        seedY = y;
+                        break;
+                    }
+                }
+                if (seedX >= 0 && seedY >= 0)
+                    break;
+            }
+
+            if (seedX < 0 || seedY < 0)
+                return;
+
+            // Traverse the contour, starting from initPt and terminating if either
+            // there is no next point or we come back to initPt.
+            var curPt = Tuple.Create(seedX, seedY);
+            bwImage[curPt.Item2, curPt.Item1] = 128; // Mark the current point as visited
+            var xValues = new List<double>();
+            var yValues = new List<double>();
+            xValues.Add(curPt.Item1);
+            yValues.Add(curPt.Item2); // Add to contour
+            bool atStart = true;
+            
+            while (true) // we explicitly break out of the loop when there are no candidate next pixels
+            {
+                // Create list of candidate next pixels
+                var candidateNextPts = new List<Tuple<int, int>>();
+                var nxtPt = Tuple.Create(curPt.Item1 - 1, curPt.Item2 - 1);
+                if (nxtPt.Item1 >= 0 && nxtPt.Item2 >= 0 && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1, curPt.Item2 - 1);
+                if (nxtPt.Item2 >= 0 && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1 + 1, curPt.Item2 - 1);
+                if (nxtPt.Item1 < w && nxtPt.Item2 >= 0 && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1 - 1, curPt.Item2);
+                if (nxtPt.Item1 >= 0 && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1 + 1, curPt.Item2);
+                if (nxtPt.Item1 < w && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1 - 1, curPt.Item2 + 1);
+                if (nxtPt.Item1 >= 0 && nxtPt.Item2 < h && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1, curPt.Item2 + 1);
+                if (nxtPt.Item2 < h && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+                nxtPt = Tuple.Create(curPt.Item1 + 1, curPt.Item2 + 1);
+                if (nxtPt.Item1 < w && nxtPt.Item2 < h && bwImage[nxtPt.Item2, nxtPt.Item1] == 255)
+                    candidateNextPts.Add(nxtPt);
+
+                if (!atStart && candidateNextPts.Count > 1)
+                    throw new Exception("FindClosedContour can only work on contours that are 1-pixel wide (with respect to 8-connected neighbors)");
+
+                if (candidateNextPts.Count == 0)
+                    break; // exit loop if there are no next points
+
+                atStart = false; // no longer at the start of the contour
+                nxtPt = candidateNextPts[0];
+
+                // Set the current point to the next point and mark as visited, adding it to the list
+                curPt = nxtPt;
+                bwImage[curPt.Item2, curPt.Item1] = 128; // Mark the current point as visited
+                xValues.Add(curPt.Item1);
+                yValues.Add(curPt.Item2); // Add to contour
+            }
+
+            xCoords = xValues.ToArray();
+            yCoords = yValues.ToArray();
+        }
+
+        /// <summary>
+        ///     Apply a curvature-based smoothing algorithm to the contour.
+        /// </summary>
+        /// <param name="xCoords">Array of x-coordinates of the contour</param>
+        /// <param name="yCoords">Array of y-coordinates of the contour</param>
+        /// <param name="smoothingTime">Total smoothing "time".</param>
+        /// <param name="maxTStep">Minimum time-step to use</param>
+        /// <param name="maxTStep">Maximum time-step to use</param>
+        /// <param name="isPeriodic">Whether or not to use periodic boundary conditions</param>
+        /// <remarks>
+        /// Algorithm moves each point in the direction of the normal at a
+        /// velocity equal to the curvature (in radians per unit length). The smoothing "speed" can
+        /// be controlled by maxTStep and the total amount of smoothing can be controlled by smoothingTime.
+        /// </remarks>
+        public static void CurvatureSmoothContour(double[] xCoords, double[] yCoords, float smoothingTime, float minTStep,
+            float maxTStep, bool isPeriodic)
+        {
+            float epsilon = 1.0e-6f; // positive number very close to zero
+            float huge = 1.0e9f; // very large positive number
+
+            int n = xCoords.Length;
+
+            if (n <= 2) // Can't smooth a component consisting of just 2 points
+                return;
+
+            // Apply the curvature-driven smoothing to the contour
+            var tempX = new double[n];
+            var tempY = new double[n];
+            var curvatures = new double[n];
+            double x0, y0, x1, y1, x2, y2, xt, yt, magT, magN;
+            float t = 0.0f, tStep;
+            bool running = true;
+            while (running)
+            {
+                #region - Find tStep, and compute curvatures and normals -
+
+                tStep = maxTStep;
+                for (int p = 0; p < n; p++)
+                {
+                    x0 = xCoords[(p + n - 1) % n];
+                    y0 = yCoords[(p + n - 1) % n];
+                    x1 = xCoords[p];
+                    y1 = yCoords[p];
+                    x2 = xCoords[(p + 1) % n];
+                    y2 = yCoords[(p + 1) % n];
+
+                    // Use zero-curvature boundary conditions if periodic is not specified
+                    if (!isPeriodic && (p == 0 || p == n - 1))
+                    {
+                        curvatures[p] = 0.0;
+                        tempX[p] = 0.0;
+                        tempY[p] = 0.0;
+                        continue;
+                    }
+                    xt = 0.5 * (x2 - x0);
+                    yt = 0.5 * (y2 - y0); // (xt, yt) is the approximate tangent vector
+                    magT = Math.Sqrt(xt * xt + yt * yt);
+                    if (magT > epsilon)
+                        curvatures[p] = Math.Abs(ThetaChange(x1 - x0, y1 - y0, x2 - x1, y2 - y1)) / magT;
+                    else
+                        curvatures[p] = huge;
+                    // If the curvature is too small, don't try to move the point
+                    if (curvatures[p] <= epsilon)
+                    {
+                        tempX[p] = 0.0;
+                        tempY[p] = 0.0;
+                        continue;
+                    }
+                    tempX[p] = (float)(0.5 * (x2 + x0) - x1);
+                    tempY[p] = (float)(0.5 * (y2 + y0) - y1);
+                    // Use (tempX[p], tempY[p]) to store the approximate normal vector
+                    magN = Math.Sqrt(tempX[p] * tempX[p] + tempY[p] * tempY[p]);
+                    if (magN <= epsilon)
+                    {
+                        // If the normal is unstable, don't try to move the point
+                        tempX[p] = 0.0;
+                        tempY[p] = 0.0;
+                        continue;
+                    }
+
+                    // Limit the motion to the size of magN, so the motion of the curve doesn't over-shoot
+                    // the average of the neighbors (unless curvture == huge, in which case tStep will be set too small unless we stop it).
+                    if (magN < curvatures[p] * tStep && curvatures[p] != huge)
+                        tStep = (float)(magN / curvatures[p]);
+                } // end for (int p = 0; p < n; p++)
+                if (tStep > maxTStep)
+                    tStep = maxTStep;
+                if (tStep < minTStep)
+                    tStep = minTStep;
+                if (smoothingTime < t + tStep)
+                {
+                    tStep = smoothingTime - t;
+                    if (tStep < 0.0f) // In case of floating-point rounding error
+                        tStep = 0.0f;
+                    running = false;
+                }
+
+                #endregion - Find tStep, and compute curvatures and normals -
+
+                #region - Apply smoothing -
+
+                for (int p = 0; p < n; p++)
+                {
+                    magN = Math.Sqrt(tempX[p] * tempX[p] + tempY[p] * tempY[p]);
+                    if (magN > epsilon)
+                    {
+                        if (tStep * curvatures[p] < magN)
+                        // ensure the point doesn't overshoot the midpoint of the neighbors
+                        {
+                            // Add tStep * curvatures[p] * unit-normal to the position of the point
+                            tempX[p] = (float)(xCoords[p] + tStep * curvatures[p] * tempX[p] / magN);
+                            tempY[p] = (float)(yCoords[p] + tStep * curvatures[p] * tempY[p] / magN);
+                        }
+                        else
+                        {
+                            // Move the point all the way to the midpoint of the neighbors
+                            tempX[p] = (float)(xCoords[p] + tempX[p]);
+                            tempY[p] = (float)(yCoords[p] + tempY[p]);
+                        }
+                    }
+                    else
+                    {
+                        // If the normal is unstable, don't try to move the point
+                        tempX[p] = xCoords[p];
+                        tempY[p] = yCoords[p];
+                    }
+                }
+                for (int p = 0; p < n; p++)
+                {
+                    xCoords[p] = tempX[p];
+                    yCoords[p] = tempY[p];
+                }
+
+                #endregion - Apply smoothing -
+
+                t += tStep;
+            } // end while (running)
+        } // end method CurvatureSmoothContour
+
+        /// <summary>
+        ///     Compute the change in theta from one vector to the next
+        /// </summary>
+        /// <param name="x0">x-component of the first vector</param>
+        /// <param name="y0">y-component of the first vector</param>
+        /// <param name="x1">x-component of the second vector</param>
+        /// <param name="y1">y-component of the second vector</param>
+        /// <returns>Change in theta</returns>
+        private static double ThetaChange(double x0, double y0, double x1, double y1)
+        {
+            double epsilon = 1.0e-6;
+            double mag0 = Math.Sqrt(x0 * x0 + y0 * y0);
+            double mag1 = Math.Sqrt(x1 * x1 + y1 * y1);
+            if (mag0 * mag1 <= epsilon)
+                return Double.MaxValue;
+            double crossZ = (x0 * y1 - x1 * y0) / (mag0 * mag1);
+            // Z-component of the cross product of the normalized vectors
+            double dot = (x0 * x1 + y0 * y1) / (mag0 * mag1); // dot product of the normalized vectors
+            return Math.Atan2(crossZ, dot); // Angle between the two vectors
+        }
+
+        #endregion Contour Following
     }
 }
