@@ -21,9 +21,9 @@ namespace DragonFractal
             fractal.IFS.Add(Rot45 * Scale * Translate);
             fractal.IFS.Add(Rot135 * Scale * Translate);
             int sf = 256; // 2048
-            int w = 3 * sf + 100;
-            int h = 2 * sf + 100;
-            var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4 * sf / 3 + 50 }, { 0, sf, sf / 3 + 50 }, { 0, 0, 1 } });
+            int w = 3 * sf + 140;
+            int h = 2 * sf + 140;
+            var finalTransform = DenseMatrix.OfArray(new double[,] { { sf, 0, 4 * sf / 3 + 70 }, { 0, sf, sf / 3 + 70 }, { 0, 0, 1 } });
             using (DirectBitmap image = new DirectBitmap(w, h),
                 borderImage = new DirectBitmap(w, h),
                 thickImage = new DirectBitmap(w, h))
@@ -81,7 +81,7 @@ namespace DragonFractal
                     for (int x = 0; x < w; ++x)
                         if (image.Bits[w * y + x] != white)
                             maskImage[y, x] = 255;
-                int kernelRadius = 40;
+                int kernelRadius = 60;
                 bool[,] kernel = new bool[2 * kernelRadius + 1, 2 * kernelRadius + 1];
                 for (int y = -kernelRadius; y <= kernelRadius; ++y)
                     for (int x = -kernelRadius; x <= kernelRadius; ++x)
@@ -98,18 +98,35 @@ namespace DragonFractal
                 double sigma = 5.0;
                 int halfWidth = (int)Math.Ceiling(3.0 * sigma);
                 double[] gaussKernel = ImProc.ConstructGaussianKernel(sigma, halfWidth, true);
-                xCoords = ImProc.Convolve1D(xCoords, gaussKernel, 1, -1, 1);
-                yCoords = ImProc.Convolve1D(yCoords, gaussKernel, 1, -1, 1);
+                double[] xCoordsSmooth = ImProc.Convolve1D(xCoords, gaussKernel, 1, -1, 1);
+                double[] yCoordsSmooth = ImProc.Convolve1D(yCoords, gaussKernel, 1, -1, 1);
+                // Decimate smoothed curves so curvature based smoothing will work faster
+                int N = xCoords.Length;
+                int N2 = N / 10;
+                xCoords = new double[N2];
+                yCoords = new double[N2];
+                for (int i = 0; i < N2; ++i)
+                {
+                    xCoords[i] = xCoordsSmooth[(int)(i * N / (double)N2 + 0.5)];
+                    yCoords[i] = yCoordsSmooth[(int)(i * N / (double)N2 + 0.5)];
+                }
                 // Apply further curvature-based smoothing
+                ImProc.CurvatureSmoothContour(xCoords, yCoords, 2000.0, 1.0, 10.0, true);
 
+                // Extract boundary of thick fractal
+                ImProc.BWBoundary(thickImage, image, black);
+                ImProc.BWInvert(image);
 
-                // Draw contour onto thickImage
-                for (int y = 0; y < h; ++y)
-                    for (int x = 0; x < w; ++x)
-                        image.Bits[w * y + x] = black;
-                ImProc.DrawClosedContour(xCoords, yCoords, black, thickImage);
+                // Draw contour onto image
+                ImProc.DrawClosedContour(xCoords, yCoords, black, image);
 
-                IO.SaveImage(thickImage, @"C:\Users\info\Desktop\fractalwithboundary.bmp");
+                //// Add fractal boundary to image
+                //for (int y = 0; y < h; ++y)
+                //    for (int x = 0; x < w; ++x)
+                //        if (borderImage.Bits[w * y + x] == white)
+                //            image.Bits[w * y + x] = black;
+
+                IO.SaveImage(image, @"C:\Users\info\Desktop\fractalwithboundary.bmp");
             }
         }
     }

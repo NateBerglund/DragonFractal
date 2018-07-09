@@ -1359,6 +1359,19 @@ namespace DragonFractal
             }
         }
 
+        /// <summary>
+        /// Inverts an image
+        /// </summary>
+        /// <param name="inputImage">Image to invert</param>
+        public static void BWInvert(DirectBitmap inputImage)
+        {
+            int w = inputImage.Width;
+            int h = inputImage.Height;
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    inputImage.Bits[w * y + x] = unchecked((int)0xff000000) | ~inputImage.Bits[w * y + x];
+        }
+
         #endregion Binary Morph Ops
 
         #region Contour Following
@@ -1474,11 +1487,10 @@ namespace DragonFractal
         /// velocity equal to the curvature (in radians per unit length). The smoothing "speed" can
         /// be controlled by maxTStep and the total amount of smoothing can be controlled by smoothingTime.
         /// </remarks>
-        public static void CurvatureSmoothContour(double[] xCoords, double[] yCoords, float smoothingTime, float minTStep,
-            float maxTStep, bool isPeriodic)
+        public static void CurvatureSmoothContour(double[] xCoords, double[] yCoords, double smoothingTime, double minTStep, double maxTStep, bool isPeriodic)
         {
-            float epsilon = 1.0e-6f; // positive number very close to zero
-            float huge = 1.0e9f; // very large positive number
+            double epsilon = 1.0e-6f; // positive number very close to zero
+            double huge = 1.0e9f; // very large positive number
 
             int n = xCoords.Length;
 
@@ -1490,7 +1502,7 @@ namespace DragonFractal
             var tempY = new double[n];
             var curvatures = new double[n];
             double x0, y0, x1, y1, x2, y2, xt, yt, magT, magN;
-            float t = 0.0f, tStep;
+            double t = 0.0f, tStep;
             bool running = true;
             while (running)
             {
@@ -1528,8 +1540,8 @@ namespace DragonFractal
                         tempY[p] = 0.0;
                         continue;
                     }
-                    tempX[p] = (float)(0.5 * (x2 + x0) - x1);
-                    tempY[p] = (float)(0.5 * (y2 + y0) - y1);
+                    tempX[p] = 0.5 * (x2 + x0) - x1;
+                    tempY[p] = 0.5 * (y2 + y0) - y1;
                     // Use (tempX[p], tempY[p]) to store the approximate normal vector
                     magN = Math.Sqrt(tempX[p] * tempX[p] + tempY[p] * tempY[p]);
                     if (magN <= epsilon)
@@ -1543,7 +1555,7 @@ namespace DragonFractal
                     // Limit the motion to the size of magN, so the motion of the curve doesn't over-shoot
                     // the average of the neighbors (unless curvture == huge, in which case tStep will be set too small unless we stop it).
                     if (magN < curvatures[p] * tStep && curvatures[p] != huge)
-                        tStep = (float)(magN / curvatures[p]);
+                        tStep = magN / curvatures[p];
                 } // end for (int p = 0; p < n; p++)
                 if (tStep > maxTStep)
                     tStep = maxTStep;
@@ -1570,14 +1582,14 @@ namespace DragonFractal
                         // ensure the point doesn't overshoot the midpoint of the neighbors
                         {
                             // Add tStep * curvatures[p] * unit-normal to the position of the point
-                            tempX[p] = (float)(xCoords[p] + tStep * curvatures[p] * tempX[p] / magN);
-                            tempY[p] = (float)(yCoords[p] + tStep * curvatures[p] * tempY[p] / magN);
+                            tempX[p] = xCoords[p] + tStep * curvatures[p] * tempX[p] / magN;
+                            tempY[p] = yCoords[p] + tStep * curvatures[p] * tempY[p] / magN;
                         }
                         else
                         {
                             // Move the point all the way to the midpoint of the neighbors
-                            tempX[p] = (float)(xCoords[p] + tempX[p]);
-                            tempY[p] = (float)(yCoords[p] + tempY[p]);
+                            tempX[p] = xCoords[p] + tempX[p];
+                            tempY[p] = yCoords[p] + tempY[p];
                         }
                     }
                     else
