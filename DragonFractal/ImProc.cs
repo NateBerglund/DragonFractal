@@ -1372,6 +1372,134 @@ namespace DragonFractal
                     inputImage.Bits[w * y + x] = unchecked((int)0xff000000) | ~inputImage.Bits[w * y + x];
         }
 
+        /// <summary>
+        /// Implements an in-place binary filter. Elements of the 3x3 window around the current
+        /// pixel are interpreted as a binary code indexing into a lookup table that indicates
+        /// the output of the filter. Note that the image is assumed to be binary (pixels are
+        /// either 0 or 255). Note that boundary pixels are left unchanged.
+        /// </summary>
+        /// <param name="image">Image to filter</param>
+        /// <param name="lut">512-element lookup table</param>
+        public static void BWFilter(DirectBitmap image, bool[] lut)
+        {
+            int w = image.Width;
+            int h = image.Height;
+
+            int white = unchecked((int)0xffffffff); // white
+            int black = unchecked((int)0xff000000); // black
+
+            // Read first 3 rows of image into buffer
+            int[,] buffer = new int[3, w];
+            for (int y = 0; y < 3; ++y)
+                for (int x = 0; x < w; ++x)
+                    buffer[y, x] = image.Bits[w * y + x] != white ? 0 : 1;
+            int bRow = 1; // current row of buffer considered to be the "center"
+
+            for (int y = 1; y < h - 1; ++y)
+            {
+                for (int x = 1; x < w - 1; ++x)
+                {
+                    int idx = (buffer[(bRow + 2) % 3, x - 1] << 8) |
+                        (buffer[(bRow + 2) % 3, x] << 7) |
+                        (buffer[(bRow + 2) % 3, x + 1] << 6) |
+                        (buffer[bRow, x - 1] << 5) |
+                        (buffer[bRow, x] << 4) |
+                        (buffer[bRow, x + 1] << 3) |
+                        (buffer[(bRow + 1) % 3, x - 1] << 2) |
+                        (buffer[(bRow + 1) % 3, x] << 1) |
+                        buffer[(bRow + 1) % 3, x + 1];
+                    image.Bits[w * y + x] = lut[idx] ? white : black;
+                }
+
+                // Read next row of pixels into buffer
+                for (int x = 0; x < w; ++x)
+                    buffer[(bRow + 2) % 3, x] = image.Bits[w * (y + 1) + x] != white ? 0 : 1;
+
+                // Advance bRow
+                bRow = (bRow + 1) % 3;
+            }
+        }
+
+        /// <summary>
+        /// Private member variable storing the CleanWhiteDiagonalsLUT
+        /// </summary>
+        private static bool[] _cleanWhiteDiagonalsLUT = null;
+
+        /// <summary>
+        /// LUT designed for cleaning the white diagonal lines that get left in the thick fractal image.
+        /// </summary>
+        public static bool[] CleanWhiteDiagonalsLUT
+        {
+            get
+            {
+                if (null == _cleanWhiteDiagonalsLUT)
+                {
+                    _cleanWhiteDiagonalsLUT = new bool[512];
+                    bool[,] roi = new bool[3, 3];
+                    for (int b0 = 0; b0 < 2; ++b0)
+                        for (int b1 = 0; b1 < 2; ++b1)
+                            for (int b2 = 0; b2 < 2; ++b2)
+                                for (int b3 = 0; b3 < 2; ++b3)
+                                    for (int b4 = 0; b4 < 2; ++b4)
+                                        for (int b5 = 0; b5 < 2; ++b5)
+                                            for (int b6 = 0; b6 < 2; ++b6)
+                                                for (int b7 = 0; b7 < 2; ++b7)
+                                                    for (int b8 = 0; b8 < 2; ++b8)
+                                                    {
+                                                        int idx = (b0 << 8) |
+                                                            (b1 << 7) |
+                                                            (b2 << 6) |
+                                                            (b3 << 5) |
+                                                            (b4 << 4) |
+                                                            (b5 << 3) |
+                                                            (b6 << 2) |
+                                                            (b7 << 1) |
+                                                            b8;
+                                                        roi[0, 0] = b0 != 0;
+                                                        roi[0, 1] = b1 != 0;
+                                                        roi[0, 2] = b2 != 0;
+                                                        roi[1, 0] = b3 != 0;
+                                                        roi[1, 1] = b4 != 0;
+                                                        roi[1, 2] = b5 != 0;
+                                                        roi[2, 0] = b6 != 0;
+                                                        roi[2, 1] = b7 != 0;
+                                                        roi[2, 2] = b8 != 0;
+
+                                                        // Rules
+                                                        if (roi[1, 1]) // center pixel is white
+                                                        {
+                                                            bool turnBlack = false;
+                                                            int nW = 0;
+                                                            if (roi[0, 0]) ++nW;
+                                                            if (roi[0, 1]) ++nW;
+                                                            if (roi[0, 2]) ++nW;
+                                                            if (roi[1, 0]) ++nW;
+                                                            if (roi[1, 2]) ++nW;
+                                                            if (roi[2, 0]) ++nW;
+                                                            if (roi[2, 1]) ++nW;
+                                                            if (roi[2, 2]) ++nW;
+                                                            if (0 == nW)
+                                                                turnBlack = true; // always turn black if surrounded entirely by black pixels
+                                                            else if (1 == nW)
+                                                            {
+                                                                if (roi[0, 0] || roi[0, 2] || roi[2, 0] || roi[2, 2])
+                                                                    turnBlack = true; // turn black if the one other white pixel is a corner pixel
+                                                            }
+                                                            else if (2 == nW)
+                                                            {
+                                                                if ((roi[0, 0] && roi[2, 2]) || (roi[2, 0] && roi[0, 2]))
+                                                                    turnBlack = true; // turn black if the two white pixels are opposing corners
+                                                            }
+                                                            if (!turnBlack)
+                                                                _cleanWhiteDiagonalsLUT[idx] = true; // Set lut to true unless turnBlack is true
+                                                        }
+                                                    }
+
+                }
+                return _cleanWhiteDiagonalsLUT;
+            }
+        }
+
         #endregion Binary Morph Ops
 
         #region Contour Following
@@ -1633,5 +1761,48 @@ namespace DragonFractal
         }
 
         #endregion Contour Following
+
+        /// <summary>
+        /// Partitions a DirectBitmap image into sub-images of size w * h
+        /// </summary>
+        /// <param name="image">Original image</param>
+        /// <param name="w">Desired width of the sub-images</param>
+        /// <param name="h">Desired height of the sub-images</param>
+        /// <param name="boundaryColor">Color to give the boundary pixels of each sub-image</param>
+        /// <returns>Array of sub-images</returns>
+        public static DirectBitmap[] partitionImage(DirectBitmap image, int w, int h, int boundaryColor)
+        {
+            int origW = image.Width;
+            int origH = image.Height;
+            int nX = (int)Math.Ceiling(origW / (double)w);
+            int nY = (int)Math.Ceiling(origH / (double)h);
+            DirectBitmap[] retVal = new DirectBitmap[nX * nY];
+
+            for (int iY = 0; iY < nY; ++iY)
+            {
+                for (int iX = 0; iX < nX; ++iX)
+                {
+                    int startY = iY * h;
+                    int endY = Math.Min((iY + 1) * h, origH);
+                    int startX = iX * w;
+                    int endX = Math.Min((iX + 1) * w, origW);
+
+                    retVal[nX * iY + iX] = new DirectBitmap(endX - startX, endY - startY);
+                    for (int y = startY; y < endY; ++y)
+                        for (int x = startX; x < endX; ++x)
+                            retVal[nX * iY + iX].Bits[(endX - startX) * (y - startY) + (x - startX)] = image.Bits[origW * y + x];
+
+                    for (int y = startY; y < endY; y += (endY - 1 - startY))
+                        for (int x = startX; x < endX; ++x)
+                            retVal[nX * iY + iX].Bits[(endX - startX) * (y - startY) + (x - startX)] = boundaryColor;
+
+                    for (int y = startY; y < endY; ++y)
+                        for (int x = startX; x < endX; x += (endX - 1 - startX))
+                            retVal[nX * iY + iX].Bits[(endX - startX) * (y - startY) + (x - startX)] = boundaryColor;
+                }
+            }
+
+            return retVal;
+        }
     }
 }
