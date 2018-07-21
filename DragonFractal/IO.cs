@@ -33,6 +33,18 @@ namespace DragonFractal
         }
 
         /// <summary>
+        /// Save an image
+        /// </summary>
+        /// <param name="image">Image to save, stored as a DirectBitmap</param>
+        /// <param name="filename">Path to save the image to</param>
+        /// <param name="xDpi">The horizontal resolution, in dots per inch, of the image</param>
+        /// <param name="yDpi">The vertical resolution, in dots per inch, of the image</param>
+        public static void SaveImage(DirectBitmap image, string filename, float xDpi, float yDpi)
+        {
+            SaveImageHelper(image, filename, xDpi, yDpi);
+        }
+
+        /// <summary>
         /// Save an image.
         /// </summary>
         /// <param name="image">Image to save, stored as a 2-d array of bytes</param>
@@ -222,6 +234,29 @@ namespace DragonFractal
                 {
                     g.DrawImage(image.Bitmap, 0, 0);
                 }
+                SaveImageHelper(bm24, filename);
+            }
+        }
+
+        /// <summary>
+        /// This is needed because DirectBitmap stores its pixels internally as 32-bit,
+        /// even though we don't actually use transparency. Some applications have
+        /// trouble with 32-bit images, so this helps ensure all debug output images are 24-bit.
+        /// </summary>
+        /// <param name="image">Image to save, stored as a Bitmap</param>
+        /// <param name="filename">Path to save the image to</param>
+        /// <param name="xDpi">The horizontal resolution, in dots per inch, of the image</param>
+        /// <param name="yDpi">The vertical resolution, in dots per inch, of the image</param>
+        private static void SaveImageHelper(DirectBitmap image, string filename, float xDpi, float yDpi)
+        {
+            // Since the DirectBitmap type uses 32-bit images, but we want to save a 24-bit image, we must convert the bitmap here
+            using (Bitmap bm24 = new Bitmap(image.Bitmap.Width, image.Bitmap.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+            {
+                using (Graphics g = Graphics.FromImage(bm24))
+                {
+                    g.DrawImage(image.Bitmap, 0, 0);
+                }
+                bm24.SetResolution(xDpi, yDpi);
                 SaveImageHelper(bm24, filename);
             }
         }

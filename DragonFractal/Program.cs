@@ -159,7 +159,7 @@ namespace DragonFractal
                         DirectBitmap[] subImages = ImProc.partitionImage(image, 2160, 1560, black);
                         int nImages = subImages.Length;
                         for (int i = 0; i < nImages; ++i)
-                            IO.SaveImage(subImages[i], @"C:\Users\Dianna\data\DragonFractal\subimage" + i.ToString() + ".bmp");
+                            IO.SaveImage(subImages[i], @"C:\Users\Dianna\data\DragonFractal\subimage" + i.ToString() + ".bmp", 240, 240);
                     }
                 }
             }
