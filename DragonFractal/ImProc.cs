@@ -1121,6 +1121,21 @@ namespace DragonFractal
         }
 
         /// <summary>
+        /// Generate a simple rectangular kernel with the given width and height
+        /// </summary>
+        /// <param name="width">Width of the kernel</param>
+        /// <param name="height">Height of the kernel</param>
+        /// <returns>Kernel with the given size</returns>
+        public static bool[,] GenerateRectKernel(int width, int height)
+        {
+            bool[,] kernel = new bool[height, width];
+            for (int y = 0; y < height; ++y)
+                for (int x = 0; x < width; ++x)
+                    kernel[y, x] = true;
+            return kernel;
+        }
+
+        /// <summary>
         /// Dilates a binary image by a given kernel (pixels are assumed to be either 0 or 255).
         /// Pixels outside of the boundary are assumed to equal zero.
         /// </summary>

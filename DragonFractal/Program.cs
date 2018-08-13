@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -211,7 +212,69 @@ namespace DragonFractal
                         DirectBitmap[] subImages = ImProc.partitionImage(image, (int)Math.Round(subImageWidth * DPI), (int)Math.Round(subImageHeight * DPI), black);
                         int nImages = subImages.Length;
                         for (int i = 0; i < nImages; ++i)
+                        {
+                            // See if we can find any non-white pixels in the interior of this image
+                            bool done = false;
+                            for (int y = 1; y < subImages[i].Height - 1; ++y)
+                            {
+                                for (int x = 1; x < subImages[i].Width - 1; ++x)
+                                {
+                                    if ((subImages[i].Bits[subImages[i].Width * y + x] & 0x00ffffff) != (white & 0x00ffffff))
+                                    {
+                                        done = true;
+                                        break;
+                                    }
+                                }
+                                if (done)
+                                    break;
+                            }
+                            if (!done)
+                                continue; // skip saving this image if we couldn't find any non-white pixels
+
+                            using (Graphics graphics = Graphics.FromImage(subImages[i].Bitmap))
+                            {
+                                using (Font arialFont = new Font("Arial", 36))
+                                {
+                                    string text = i.ToString();
+                                    // Measure string.
+                                    SizeF stringSize = new SizeF();
+                                    stringSize = graphics.MeasureString(text, arialFont);
+                                    int hw = (int)Math.Ceiling(0.5 * (stringSize.Width + DPI / 2.0));
+                                    int hh = (int)Math.Ceiling(0.5 * (stringSize.Height + DPI / 2.0));
+                                    // Find a suitable location to put the text
+                                    byte[,] tempMask = ImProc.ToBWByteEq(subImages[i], white);
+                                    bool[,] kernel = ImProc.GenerateRectKernel(2 * hw + 1, 1);
+                                    tempMask = ImProc.BWErode(tempMask, kernel, 1, hw);
+                                    kernel = ImProc.GenerateRectKernel(1, 2 * hh + 1);
+                                    tempMask = ImProc.BWErode(tempMask, kernel, hh, 1);
+                                    // Find a pixel of tempMask near the center that is white
+                                    int wi = tempMask.GetLength(1);
+                                    int hi = tempMask.GetLength(0);
+                                    int best_x = wi / 2;
+                                    int best_y = hi / 2;
+                                    done = false;
+                                    for (int y = hi / 4; y < 3 * hi /4; ++y)
+                                    {
+                                        for (int x = wi / 4; x < 3 * wi / 4; ++x)
+                                        {
+                                            if (tempMask[y, x] == 255)
+                                            {
+                                                best_x = x;
+                                                best_y = y;
+                                                done = true;
+                                                break;
+                                            }
+                                        }
+                                        if (done)
+                                            break;
+                                    }
+                                    // Draw the text onto the image
+                                    graphics.DrawString(text, arialFont, Brushes.Black, best_x - 0.5f * stringSize.Width, best_y - 0.5f * stringSize.Height);
+                                }
+                            }
+
                             IO.SaveImage(subImages[i], Path.Combine(OUTPUT_DIRECTORY, "subimage" + i.ToString() + ".bmp"), DPI, DPI);
+                        }
                     }
                 }
             }
