@@ -8,6 +8,78 @@ namespace DragonFractal
     /// </summary>
     static class ImProc
     {
+        #region Conversion
+
+        /// <summary>
+        /// Converts image to an array of bytes that are either zero (original image was equal to black)
+        /// or 255 (original image was not equal to black). Alpha channel is ignored for the sake of the comparison.
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <returns>Binary output image</returns>
+        public static byte[,] ToBWByte(DirectBitmap inputImage)
+        {
+            return ToBWByteNeq(inputImage, unchecked((int)0xff000000));
+        }
+
+        /// <summary>
+        /// Converts image to an array of bytes that are either zero (original image was not equal to given color)
+        /// or 255 (original image was equal to given color). Alpha channel is ignored for the sake of the comparison.
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <param name="color">Color which the original pixel must be equal to in order to become 255 in the output</param>
+        /// <returns>Binary output image</returns>
+        public static byte[,] ToBWByteEq(DirectBitmap inputImage, int color)
+        {
+            int w = inputImage.Width;
+            int h = inputImage.Height;
+            byte[,] retVal = new byte[h, w];
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    retVal[y, x] = (inputImage.Bits[w * y + x] & 0x00ffffff) == (color & 0x00ffffff) ? (byte)255 : (byte)0;
+            return retVal;
+        }
+
+        /// <summary>
+        /// Converts image to an array of bytes that are either zero (original image was equal to given color)
+        /// or 255 (original image was not equal to given color). Alpha channel is ignored for the sake of the comparison.
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <param name="color">Color which the original pixel must not be equal to in order to become 255 in the output</param>
+        /// <returns>Binary output image</returns>
+        public static byte[,] ToBWByteNeq(DirectBitmap inputImage, int color)
+        {
+            int w = inputImage.Width;
+            int h = inputImage.Height;
+            byte[,] retVal = new byte[h, w];
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    retVal[y, x] = (inputImage.Bits[w * y + x] & 0x00ffffff) == (color & 0x00ffffff) ? (byte)0 : (byte)255;
+            return retVal;
+        }
+
+        /// <summary>
+        /// Converts an image stored as a byte array to a DirectBitmap
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <returns>Output image</returns>
+        public static DirectBitmap ToDirectBitmap(byte[,] inputImage)
+        {
+            int w = inputImage.GetLength(1);
+            int h = inputImage.GetLength(0);
+            DirectBitmap retVal = new DirectBitmap(w, h);
+            for (int y = 0; y < h; ++y)
+            {
+                for (int x = 0; x < w; ++x)
+                {
+                    int v = inputImage[y, x];
+                    retVal.Bits[y * w + x] = (255 << 24) | (v << 16) | (v << 8) | v;
+                }
+            }
+            return retVal;
+        }
+
+        #endregion Conversion
+
         #region Drawing
 
         /// <summary>
@@ -398,6 +470,36 @@ namespace DragonFractal
                 double y2 = yCoords[ii];
                 DrawLine(x1, y1, x2, y2, color, image);
             }
+        }
+
+        /// <summary>
+        /// Draws pixels onto the image wherever the mask is nonzero.
+        /// </summary>
+        /// <param name="image">Image to draw onto</param>
+        /// <param name="mask">Mask image (nonzero where we want colors to be drawn)</param>
+        /// <param name="color">Color to use</param>
+        public static void DrawColor(DirectBitmap image, byte[,] mask, int color)
+        {
+            int w = image.Width;
+            int h = image.Height;
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    if (mask[y, x] != 0)
+                        image.Bits[w * y + x] = color;
+        }
+
+        /// <summary>
+        /// Set all pixels of an image to a given color
+        /// </summary>
+        /// <param name="image">Input image</param>
+        /// <param name="color">Color to set the pixels to</param>
+        public static void SetColor(DirectBitmap image, int color)
+        {
+            int w = image.Width;
+            int h = image.Height;
+            for (int y = 0; y < h; ++y)
+                for (int x = 0; x < w; ++x)
+                    image.Bits[w * y + x] = color;
         }
 
         #endregion Drawing
@@ -1001,6 +1103,24 @@ namespace DragonFractal
         #region Binary Morph Ops
 
         /// <summary>
+        /// Generate a disc shaped kernel with a given radius. Note that the size of
+        /// the kernel is guaranteed to be a square with an odd number of pixels,
+        /// so that one pixel is at the exact center.
+        /// </summary>
+        /// <param name="radius">Radius of the disc</param>
+        /// <returns>Kernel with the given radius</returns>
+        public static bool[,] GenerateDiscKernel(double radius)
+        {
+            int hw = (int)Math.Ceiling(radius);
+            bool[,] kernel = new bool[2 * hw + 1, 2 * hw + 1];
+            for (int y = -hw; y <= hw; ++y)
+                for (int x = -hw; x <= hw; ++x)
+                    if (x * x + y * y <= radius * radius)
+                        kernel[hw + y, hw + x] = true;
+            return kernel;
+        }
+
+        /// <summary>
         /// Dilates a binary image by a given kernel (pixels are assumed to be either 0 or 255).
         /// Pixels outside of the boundary are assumed to equal zero.
         /// </summary>
@@ -1084,6 +1204,34 @@ namespace DragonFractal
             }
 
             return result;
+        }
+
+        /// <summary>
+        /// Opens a binary image (erode then dilate) by a given kernel (pixels are assumed to be either 0 or 255).
+        /// Pixels outside of the boundary are assumed to equal zero.
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <param name="kernel">Kernel</param>
+        /// <param name="rowOrigin">Row that should be considered the origin in the kernel</param>
+        /// <param name="colOrigin">Column that should be considered the origin in the kernel</param>
+        /// <returns>Opened image</returns>
+        public static byte[,] BWOpen(byte[,] inputImage, bool[,] kernel, int rowOrigin, int colOrigin)
+        {
+            return BWDilate(BWErode(inputImage, kernel, rowOrigin, colOrigin), kernel, rowOrigin, colOrigin);
+        }
+
+        /// <summary>
+        /// Closes a binary image (dilate then erode) by a given kernel (pixels are assumed to be either 0 or 255).
+        /// Pixels outside of the boundary are assumed to equal zero.
+        /// </summary>
+        /// <param name="inputImage">Input image</param>
+        /// <param name="kernel">Kernel</param>
+        /// <param name="rowOrigin">Row that should be considered the origin in the kernel</param>
+        /// <param name="colOrigin">Column that should be considered the origin in the kernel</param>
+        /// <returns>Closed image</returns>
+        public static byte[,] BWClose(byte[,] inputImage, bool[,] kernel, int rowOrigin, int colOrigin)
+        {
+            return BWErode(BWDilate(inputImage, kernel, rowOrigin, colOrigin), kernel, rowOrigin, colOrigin);
         }
 
         /// <summary>
@@ -1232,7 +1380,8 @@ namespace DragonFractal
 
         /// <summary>
         /// Simple boundary detection. Render in white all pixels where any
-        /// neighbors differed from the pixel at the center.
+        /// neighbors differed from the pixel at the center. All other pixels
+        /// will be set to black.
         /// </summary>
         /// <param name="inputImage">Original image</param>
         /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
@@ -1276,7 +1425,8 @@ namespace DragonFractal
 
         /// <summary>
         /// Simple boundary detection. Render in white all pixels where any
-        /// neighbors differed from the pixel at the center.
+        /// neighbors differed from the pixel at the center. If a pixel is
+        /// not on the boundary, it will remain its original color in destinationImage.
         /// </summary>
         /// <param name="inputImage">Original image</param>
         /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
@@ -1289,32 +1439,57 @@ namespace DragonFractal
                 throw new Exception("BWBoundary: size of destination image does not match size of input image!");
 
             int white = unchecked((int)0xffffffff); // white
-            int black = unchecked((int)0xff000000); // black
-
-            // Set image borders to black
-            for (int y = 0; y < h; ++y)
-                for (int x = 0; x < w; x += w - 1)
-                    destinationImage.Bits[w * y + x] = black;
-            for (int y = 0; y < h; y += h - 1)
-                for (int x = 0; x < w; ++x)
-                    destinationImage.Bits[w * y + x] = black;
 
             for (int y = 1; y < h - 1; ++y)
             {
                 for (int x = 1; x < w - 1; ++x)
                 {
                     int cntr = inputImage.Bits[w * y + x];
-                    if ((inputImage.Bits[w * (y - 1) + x - 1] == cntr &&
-                        inputImage.Bits[w * (y - 1) + x] == cntr &&
-                        inputImage.Bits[w * (y - 1) + x + 1] == cntr &&
-                        inputImage.Bits[w * y + x - 1] == cntr &&
-                        inputImage.Bits[w * y + x + 1] == cntr &&
-                        inputImage.Bits[w * (y + 1) + x - 1] == cntr &&
-                        inputImage.Bits[w * (y + 1) + x] == cntr &&
-                        inputImage.Bits[w * (y + 1) + x + 1] == cntr) ||
-                        inputImage.Bits[w * y + x] != restrictColor)
-                        destinationImage.Bits[w * y + x] = black;
-                    else
+                    if ((inputImage.Bits[w * (y - 1) + x - 1] != cntr ||
+                        inputImage.Bits[w * (y - 1) + x] != cntr ||
+                        inputImage.Bits[w * (y - 1) + x + 1] != cntr ||
+                        inputImage.Bits[w * y + x - 1] != cntr ||
+                        inputImage.Bits[w * y + x + 1] != cntr ||
+                        inputImage.Bits[w * (y + 1) + x - 1] != cntr ||
+                        inputImage.Bits[w * (y + 1) + x] != cntr ||
+                        inputImage.Bits[w * (y + 1) + x + 1] != cntr) &&
+                        inputImage.Bits[w * y + x] == restrictColor)
+                        destinationImage.Bits[w * y + x] = white;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Simple boundary detection. Render in white all pixels where any
+        /// neighbors differed from the pixel at the center. If a pixel is
+        /// not on the boundary, it will remain its original color in destinationImage.
+        /// </summary>
+        /// <param name="inputImage">Original image</param>
+        /// <param name="destinationImage">Destination image for the boundary (must be the same size as inputImage)</param>
+        /// <param name="restrictColor">Only label as boundary pixels, pixels which are this color</param>
+        public static void BWBoundary(byte[,] inputImage, DirectBitmap destinationImage, byte restrictColor)
+        {
+            int w = inputImage.GetLength(1);
+            int h = inputImage.GetLength(0);
+            if (destinationImage.Width != w || destinationImage.Height != h)
+                throw new Exception("BWBoundary: size of destination image does not match size of input image!");
+
+            int white = unchecked((int)0xffffffff); // white
+
+            for (int y = 1; y < h - 1; ++y)
+            {
+                for (int x = 1; x < w - 1; ++x)
+                {
+                    byte cntr = inputImage[y, x];
+                    if ((inputImage[y - 1, x - 1] != cntr ||
+                        inputImage[y - 1, x] != cntr ||
+                        inputImage[y - 1, x + 1] != cntr ||
+                        inputImage[y, x - 1] != cntr ||
+                        inputImage[y, x + 1] != cntr ||
+                        inputImage[y + 1, x - 1] != cntr ||
+                        inputImage[y + 1, x] != cntr ||
+                        inputImage[y + 1, x + 1] != cntr) &&
+                        inputImage[y, x] == restrictColor)
                         destinationImage.Bits[w * y + x] = white;
                 }
             }
