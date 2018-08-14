@@ -20,6 +20,7 @@ namespace DragonFractal
             double subImageWidth = 9.0; // width of sub-images in inches
             double subImageHeight = 6.5; // height of sub-images in inches
             int previewSF = 16; // Scale factor to use between the initial low-res preview and the final rull-res result. Must be a power of 2.
+            double[] toolRadii = new double[] { 1 / 32.0, 1 / 16.0, 1 / 8.0, 1 / 4.0 }; // radii of the tools we have available in inches, ordered from smallest to largest
 
             // Iterated function system defining the dragon fractal
             Fractal fractal = new Fractal();
@@ -91,23 +92,10 @@ namespace DragonFractal
                     for (int i = 0; i < nIterSS; ++i)
                         fractal.RenderFractal(image, i, fractal.renderSecondarySpirals, finalTransform, blue, black);
 
-                    // Dilate the first image with a disc shaped kernel of radius 1/32 inch
-                    // Then draw these pixels in black onto the thickImage. This will make the spirals of the thick image
-                    // never get thinner than our smallest tool.
-                    {
-                        byte[,] tempMask = ImProc.ToBWByteEq(image, blue);
-                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI / 32.0);
-                        int kernelRadius = (kernel.GetLength(0) - 1) / 2;
-                        tempMask = ImProc.BWDilate(tempMask, kernel, kernelRadius, kernelRadius);
-                        ImProc.DrawColor(thickImage, tempMask, black);
-                    }
-                    GC.Collect(); // free up memory we temporarily allocated
-
                     // Clean up the white diagonal lines
                     ImProc.BWFilter(thickImage, ImProc.CleanWhiteDiagonalsLUT);
 
                     IO.SaveImage(image, Path.Combine(OUTPUT_DIRECTORY, "thinfractal" + bigIter.ToString() + ".bmp"));
-                    IO.SaveImage(thickImage, Path.Combine(OUTPUT_DIRECTORY, "fractal" + bigIter.ToString() + ".bmp"));
                     IO.SaveImage(borderImage, Path.Combine(OUTPUT_DIRECTORY, "fractalborder" + bigIter.ToString() + ".bmp"));
 
                     if (0 == bigIter)
@@ -152,64 +140,55 @@ namespace DragonFractal
                         }
                     }
 
-                    // Extract boundary of thick fractal
-                    ImProc.SetColor(image, black);
-                    ImProc.BWBoundary(thickImage, image, black);
-
-                    // Open the fractal with a disc shaped kernel of radius 1/16 inch,
-                    // adding this boundary to the original boundary. This will show
-                    // us how far a tool of radius 1/16 inch can make it into the spirals.
+                    // Clear borderImage for more drawing operations
+                    ImProc.SetColor(borderImage, black); // Comment out this line to include the fractal boundary in the final image
+                    
+                    // Add the boundaries of the region(s) reachable by each tool
+                    for (int t = 0; t < toolRadii.Length; ++t)
                     {
+                        // Open the fractal with a disc shaped kernel of radius toolRadii[t],
+                        // adding this boundary to the original boundary. This will show
+                        // us how far a tool of radius toolRadii[t] can make it into the spirals.
                         byte[,] tempMask = ImProc.ToBWByteEq(thickImage, black);
-                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI / 16.0);
+                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI * toolRadii[t]);
                         int kernelRadius = (kernel.GetLength(0) - 1) / 2;
                         tempMask = ImProc.BWOpen(tempMask, kernel, kernelRadius, kernelRadius);
-                        ImProc.BWBoundary(tempMask, image, 255);
+                        ImProc.BWBoundary(tempMask, borderImage, 255);
+                        GC.Collect(); // free up memory we temporarily allocated
+                    }
+
+                    // Dilate the blue region in the first image with a disc shaped kernel of radius of toolRadii[0]
+                    // Then draw these pixels in black onto the thickImage. This will make the spirals of the thick image
+                    // never get thinner than our smallest tool.
+                    {
+                        byte[,] tempMask = ImProc.ToBWByteEq(image, blue);
+                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI * toolRadii[0]);
+                        int kernelRadius = (kernel.GetLength(0) - 1) / 2;
+                        tempMask = ImProc.BWDilate(tempMask, kernel, kernelRadius, kernelRadius);
+                        ImProc.DrawColor(thickImage, tempMask, black);
                     }
                     GC.Collect(); // free up memory we temporarily allocated
 
-                    // Open the fractal with a disc shaped kernel of radius 1/8 inch,
-                    // adding this boundary to the original boundary. This will show
-                    // us how far a tool of radius 1/8 inch can make it into the spirals.
-                    {
-                        byte[,] tempMask = ImProc.ToBWByteEq(thickImage, black);
-                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI / 8.0);
-                        int kernelRadius = (kernel.GetLength(0) - 1) / 2;
-                        tempMask = ImProc.BWOpen(tempMask, kernel, kernelRadius, kernelRadius);
-                        ImProc.BWBoundary(tempMask, image, 255);
-                    }
-                    GC.Collect(); // free up memory we temporarily allocated
+                    // Clean up the white diagonal lines
+                    ImProc.BWFilter(thickImage, ImProc.CleanWhiteDiagonalsLUT);
 
-                    // Open the fractal with a disc shaped kernel of radius 1/4 inch,
-                    // adding this boundary to the original boundary. This will show
-                    // us how far a tool of radius 1/4 inch can make it into the spirals.
-                    {
-                        byte[,] tempMask = ImProc.ToBWByteEq(thickImage, black);
-                        bool[,] kernel = ImProc.GenerateDiscKernel(DPI / 4.0);
-                        int kernelRadius = (kernel.GetLength(0) - 1) / 2;
-                        tempMask = ImProc.BWOpen(tempMask, kernel, kernelRadius, kernelRadius);
-                        ImProc.BWBoundary(tempMask, image, 255);
-                    }
-                    GC.Collect(); // free up memory we temporarily allocated
+                    IO.SaveImage(thickImage, Path.Combine(OUTPUT_DIRECTORY, "fractal" + bigIter.ToString() + ".bmp"));
+
+                    // Extract and add boundary of thick fractal
+                    ImProc.BWBoundary(thickImage, borderImage, black);
 
                     // Invert the image
-                    ImProc.BWInvert(image);
+                    ImProc.BWInvert(borderImage);
 
-                    // Draw contour onto image
-                    ImProc.DrawClosedContour(xCoords, yCoords, black, image);
+                    // Draw contour onto borderImage
+                    ImProc.DrawClosedContour(xCoords, yCoords, black, borderImage);
 
-                    //// Add fractal boundary to image
-                    //for (int y = 0; y < h; ++y)
-                    //    for (int x = 0; x < w; ++x)
-                    //        if (borderImage.Bits[w * y + x] == white)
-                    //            image.Bits[w * y + x] = black;
-
-                    IO.SaveImage(image, Path.Combine(OUTPUT_DIRECTORY, "fractalwithboundary" + bigIter.ToString() + ".bmp"));
+                    IO.SaveImage(borderImage, Path.Combine(OUTPUT_DIRECTORY, "fractalwithboundary" + bigIter.ToString() + ".bmp"));
 
                     // Divide the image into sub-images and save them
                     if (1 == bigIter)
                     {
-                        DirectBitmap[] subImages = ImProc.partitionImage(image, (int)Math.Round(subImageWidth * DPI), (int)Math.Round(subImageHeight * DPI), black);
+                        DirectBitmap[] subImages = ImProc.partitionImage(borderImage, (int)Math.Round(subImageWidth * DPI), (int)Math.Round(subImageHeight * DPI), black);
                         int nImages = subImages.Length;
                         for (int i = 0; i < nImages; ++i)
                         {
