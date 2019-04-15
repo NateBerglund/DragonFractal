@@ -473,6 +473,32 @@ namespace DragonFractal
         }
 
         /// <summary>
+        /// Measures the area bounded by a closed contour
+        /// </summary>
+        /// <param name="xCoords">Array of x-coordinates of the contour</param>
+        /// <param name="yCoords">Array of y-coordinates of the contour</param>
+        /// <returns>Area enclosed by the contour</returns>
+        public static double MeasureArea(double[] xCoords, double[] yCoords)
+        {
+            int N = xCoords.Length;
+            if (yCoords.Length != N)
+                throw new Exception("MeasureArea: Lengths of xCoords and yCoords do not match!");
+
+            double area = 0.0;
+            for (int i = 0; i < N; ++i)
+            {
+                int ii = (i + 1) % N;
+                double x1 = xCoords[i];
+                double y1 = yCoords[i];
+                double x2 = xCoords[ii];
+                double y2 = yCoords[ii];
+                area += (x2 + x1) * (y2 - y1);
+            }
+            area *= 0.5;
+            return area;
+        }
+
+        /// <summary>
         /// Draws pixels onto the image wherever the mask is nonzero.
         /// </summary>
         /// <param name="image">Image to draw onto</param>

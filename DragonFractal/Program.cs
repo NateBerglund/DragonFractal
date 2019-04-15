@@ -14,7 +14,7 @@ namespace DragonFractal
     {
         static void Main(string[] args)
         {
-            string OUTPUT_DIRECTORY = @"C:\Users\Dianna\data\DragonFractal";
+            string OUTPUT_DIRECTORY = @"C:\Users\Dianna2\data\DragonFractal";
             Directory.CreateDirectory(OUTPUT_DIRECTORY);
             double base_size = (512.0 / 30.0); // base size is approximately 17.067 inches, fractal will be approximately 3 * base_size by 2 * base_size.
             double subImageWidth = 9.0; // width of sub-images in inches
@@ -32,7 +32,11 @@ namespace DragonFractal
             fractal.IFS.Add(Rot45 * Scale * Translate);
             fractal.IFS.Add(Rot135 * Scale * Translate);
 
+            // x and y coordinates of the coffee table boundary polygon
             double[] xCoords = null, yCoords = null;
+
+            // x and y coordinates of the (estimated) resin boundary polygon
+            double[] xCoordsResin = null, yCoordsResin = null;
 
             for (int bigIter = 0; bigIter < 2; ++bigIter)
             {
@@ -128,6 +132,33 @@ namespace DragonFractal
                         }
                         // Apply further curvature-based smoothing
                         ImProc.CurvatureSmoothContour(xCoords, yCoords, 2000.0, 1.0, 10.0, true);
+
+                        // Estimate resin boundary
+                        maskImage = ImProc.ToBWByteNeq(image, white); // mask indicates where original image is non-white
+                        kernel = ImProc.GenerateDiscKernel((DPI * 3) / 8); // Filter radius = 3/8 inch
+                        kernelRadius = (kernel.GetLength(0) - 1) / 2;
+                        maskImage = ImProc.BWDilate(maskImage, kernel, kernelRadius, kernelRadius);
+                        maskImage2 = new byte[h, w];
+                        ImProc.BWBoundary4(maskImage, maskImage2, 255);
+                        maskImage = null;
+                        // Detect the contour
+                        ImProc.FindClosedContour(maskImage2, out xCoordsResin, out yCoordsResin);
+                        // Smooth the contour
+                        sigma = 5.0;
+                        halfWidth = (int)Math.Ceiling(3.0 * sigma);
+                        gaussKernel = ImProc.ConstructGaussianKernel(sigma, halfWidth, true);
+                        xCoordsSmooth = ImProc.Convolve1D(xCoordsResin, gaussKernel, 1, -1, 1);
+                        yCoordsSmooth = ImProc.Convolve1D(yCoordsResin, gaussKernel, 1, -1, 1);
+                        // Decimate smoothed curves so curvature based smoothing will work faster
+                        N = xCoordsResin.Length;
+                        N2 = N / 10;
+                        xCoordsResin = new double[N2];
+                        yCoordsResin = new double[N2];
+                        for (int i = 0; i < N2; ++i)
+                        {
+                            xCoordsResin[i] = xCoordsSmooth[(int)(i * N / (double)N2 + 0.5)];
+                            yCoordsResin[i] = yCoordsSmooth[(int)(i * N / (double)N2 + 0.5)];
+                        }
                     }
                     else
                     {
@@ -137,6 +168,13 @@ namespace DragonFractal
                         {
                             xCoords[i] = xCoords[i] * previewSF;
                             yCoords[i] = yCoords[i] * previewSF;
+                        }
+
+                        N = xCoordsResin.Length;
+                        for (int i = 0; i < N; ++i)
+                        {
+                            xCoordsResin[i] = xCoordsResin[i] * previewSF;
+                            yCoordsResin[i] = yCoordsResin[i] * previewSF;
                         }
                     }
 
@@ -182,6 +220,17 @@ namespace DragonFractal
 
                     // Draw contour onto borderImage
                     ImProc.DrawClosedContour(xCoords, yCoords, black, borderImage);
+
+                    // Draw resin contour onto borderImage, and save info (area enclosed by curve)
+                    ImProc.DrawClosedContour(xCoordsResin, yCoordsResin, red, borderImage);
+                    string fractalInfoFilename = Path.Combine(OUTPUT_DIRECTORY, "fractalinfo" + bigIter.ToString() + ".txt");
+                    using (StreamWriter sw = new StreamWriter(fractalInfoFilename))
+                    {
+                        double areaPixels = ImProc.MeasureArea(xCoords, yCoords);
+                        sw.WriteLine("Total area enclosed by boundary = " + (areaPixels / (144.0 * DPI * DPI)).ToString() + " square feet");
+                        areaPixels = ImProc.MeasureArea(xCoordsResin, yCoordsResin);
+                        sw.WriteLine("Resin area = " + (areaPixels / (144.0 * DPI * DPI)).ToString() + " square feet");
+                    }
 
                     IO.SaveImage(borderImage, Path.Combine(OUTPUT_DIRECTORY, "fractalwithboundary" + bigIter.ToString() + ".bmp"));
 
