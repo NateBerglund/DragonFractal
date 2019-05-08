@@ -16,11 +16,15 @@ namespace DragonFractal
         {
             string OUTPUT_DIRECTORY = @"C:\Users\Dianna2\data\DragonFractal";
             Directory.CreateDirectory(OUTPUT_DIRECTORY);
-            double base_size = (512.0 / 30.0); // base size is approximately 17.067 inches, fractal will be approximately 3 * base_size by 2 * base_size.
+            double base_size = (512.0 / 45.0); // base size is approximately 11.378 inches, fractal will be approximately 3 * base_size by 2 * base_size.
             double subImageWidth = 9.0; // width of sub-images in inches
             double subImageHeight = 6.5; // height of sub-images in inches
             int previewSF = 16; // Scale factor to use between the initial low-res preview and the final rull-res result. Must be a power of 2.
             double[] toolRadii = new double[] { 1 / 32.0, 1 / 16.0, 1 / 8.0, 1 / 4.0 }; // radii of the tools we have available in inches, ordered from smallest to largest
+            const int N_ITER_PREVIEW = 18;
+            const int N_ITER_FINAL = 26;
+            const int N_ITER_SECONDARY_PREVIEW = 10;
+            const int N_ITER_SECONDARY_FINAL = 14;
 
             // Iterated function system defining the dragon fractal
             Fractal fractal = new Fractal();
@@ -66,8 +70,8 @@ namespace DragonFractal
                         }
                     }
 
-                    // Render fractal to 18 iterations, using a simple line segment as the base unit
-                    fractal.RenderFractal(image, 0 == bigIter ? 18 : 26, Fractal.renderLine, finalTransform, black, black);
+                    // Render fractal to N_ITER_PREVIEW/N_ITER_FINAL iterations, using a simple line segment as the base unit
+                    fractal.RenderFractal(image, 0 == bigIter ? N_ITER_PREVIEW : N_ITER_FINAL, Fractal.renderLine, finalTransform, black, black);
                     ImProc.BWBoundary(image, borderImage, black); // compute boundary
                     fractal.ReferenceImage = borderImage;
                     fractal.AuxImage = thickImage;
@@ -91,7 +95,7 @@ namespace DragonFractal
                         ImProc.DrawTaperedSpiral(pointBT[0] / pointBT[2], pointBT[1] / pointBT[2], theta - 3 * Math.PI / 4 + i * Math.PI / 4, scaleFactor * Math.Sqrt(2.0) * Math.Pow(0.5, 0.5 * i) * 2.0 / 3.0, 0, Math.PI / 4, Math.PI / 1000, 1.0 / 16.0, 0.02, 1.0, black, thickImage);
                     }
 
-                    int nIterSS = 0 == bigIter ? 10 : 14; // number of iterations of the secondary spirals to compute
+                    int nIterSS = 0 == bigIter ? N_ITER_SECONDARY_PREVIEW : N_ITER_SECONDARY_FINAL; // number of iterations of the secondary spirals to compute
                     // Render iterations of the secondary spirals onto the fractal
                     for (int i = 0; i < nIterSS; ++i)
                         fractal.RenderFractal(image, i, fractal.renderSecondarySpirals, finalTransform, blue, black);
@@ -138,11 +142,16 @@ namespace DragonFractal
                         kernel = ImProc.GenerateDiscKernel((DPI * 3) / 8); // Filter radius = 3/8 inch
                         kernelRadius = (kernel.GetLength(0) - 1) / 2;
                         maskImage = ImProc.BWDilate(maskImage, kernel, kernelRadius, kernelRadius);
-                        maskImage2 = new byte[h, w];
-                        ImProc.BWBoundary4(maskImage, maskImage2, 255);
-                        maskImage = null;
+                        //maskImage2 = new byte[h, w];
+                        List<Tuple<int, int>> seeds = new List<Tuple<int, int>>();
+                        seeds.Add(Tuple.Create(0, 0));
+                        List<Tuple<int, int>> contour;
+                        ImProc.BWSelect(maskImage, out maskImage2, seeds, 0, 255, 0, out contour);
+                        maskImage = new byte[h, w];
+                        ImProc.BWBoundary4(maskImage2, maskImage, 255);
+                        maskImage2 = null;
                         // Detect the contour
-                        ImProc.FindClosedContour(maskImage2, out xCoordsResin, out yCoordsResin);
+                        ImProc.FindClosedContour(maskImage, out xCoordsResin, out yCoordsResin);
                         // Smooth the contour
                         sigma = 5.0;
                         halfWidth = (int)Math.Ceiling(3.0 * sigma);
@@ -222,7 +231,8 @@ namespace DragonFractal
                     ImProc.DrawClosedContour(xCoords, yCoords, black, borderImage);
 
                     // Draw resin contour onto borderImage, and save info (area enclosed by curve)
-                    ImProc.DrawClosedContour(xCoordsResin, yCoordsResin, red, borderImage);
+                    if (0 == bigIter)
+                        ImProc.DrawClosedContour(xCoordsResin, yCoordsResin, red, borderImage);
                     string fractalInfoFilename = Path.Combine(OUTPUT_DIRECTORY, "fractalinfo" + bigIter.ToString() + ".txt");
                     using (StreamWriter sw = new StreamWriter(fractalInfoFilename))
                     {

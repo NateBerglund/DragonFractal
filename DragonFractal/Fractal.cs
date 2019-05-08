@@ -71,7 +71,7 @@ namespace DragonFractal
         }
 
         /// <summary>
-        /// Renders the primary spirals of the fractal in red (transformed according to transform) as the base unit.
+        /// Renders the primary spirals of the fractal (transformed according to transform) as the base unit.
         /// NOTE: This will only render the spirals correctly if the transform is a product of
         /// rotations, translations and scalings (must scale both coordinates uniformly)
         /// </summary>
